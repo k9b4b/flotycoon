@@ -163,8 +163,8 @@ export function FleetMap({ snap, pace, selectedId, onSelect, preview, visible = 
         mk = { m: new maplibregl.Marker({ element: el }).setLngLat([t.lon, t.lat]).addTo(m), el };
         markers.current.set(t.truck.id, mk);
       }
-      mk.el.textContent = t.driver.nickname[0];
-      mk.el.title = `${t.truck.plate} · ${t.driver.nickname} · ${t.statusLabel}`;
+      mk.el.textContent = String(t.fleetNo);
+      mk.el.title = `#${t.fleetNo} · ${t.driver.nickname} · ${t.truck.brand} ${t.truck.model} · ${t.statusLabel}`;
       mk.el.dataset.status = t.status;
       mk.el.classList.toggle('selected', t.truck.id === selectedId);
       if (!t.trip) {

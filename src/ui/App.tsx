@@ -178,7 +178,15 @@ export function App() {
         <FleetPanel
           snap={snap}
           selectedId={selectedId}
-          onSelect={setSelected}
+          onSelect={(id) => {
+            setSelected(id);
+            // Na komputerze mapa jest obok, więc od razu pokazujemy na niej zestaw.
+            if (!mobile) setFocus({ kind: 'truck', id, n: (focus?.n ?? 0) + 1 });
+          }}
+          onFindJob={(id) => {
+            setSelected(id);
+            if (mobile) switchTab('market');
+          }}
           onLease={() => run(sim.leaseTruck())}
           onService={(id) => run(sim.serviceTruck(id))}
           onShowOnMap={showTruckOnMap}

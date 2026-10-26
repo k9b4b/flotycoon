@@ -149,8 +149,7 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
   .clock .label { display: none; }
   .speed { width: 100%; justify-content: space-between; }
   .speed button { flex: 1; }
-  .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .cost-row { grid-template-columns: 110px minmax(0, 1fr) 84px; }
+    .cost-row { grid-template-columns: 110px minmax(0, 1fr) 84px; }
 }
 
 /* ── KPI ───────────────────────────────────────────── */
@@ -209,7 +208,7 @@ select {
 .maplibregl-marker { position: absolute; top: 0; left: 0; will-change: transform; }
 .city-label { font: 600 11px/1 var(--font); color: var(--muted); text-shadow: 0 0 3px #0a0d12, 0 0 3px #0a0d12; pointer-events: none; white-space: nowrap; }
 .truck-pin {
-  width: 18px; height: 16px; border-radius: 4px;
+  min-width: 18px; height: 16px; padding: 0 3px; border-radius: 4px;
   display: grid; place-items: center;
   font: 700 10px/1 var(--mono); color: var(--accent-ink);
   background: var(--accent); border: 1.5px solid var(--bg);
@@ -257,15 +256,6 @@ select {
 .map-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }
 
 /* ── Flota ─────────────────────────────────────────── */
-.truck-card {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
-  cursor: pointer;
-  background: var(--panel-2);
-}
-.truck-card.selected { border-color: var(--accent); }
 .truck-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .plate {
   font-family: var(--mono);
@@ -279,11 +269,89 @@ select {
 }
 .progress { height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; margin: 8px 0 4px; }
 .progress > div { height: 100%; background: var(--accent); }
-.stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
-.stat .bar { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin-top: 3px; }
-.stat .bar > div { height: 100%; }
-.stat .name { font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .quirk { font-size: 12px; color: var(--muted); font-style: italic; margin-top: 6px; }
+
+/* ── Karta zestawu ─────────────────────────────── */
+.fleet-list { display: flex; flex-direction: column; gap: 10px; }
+.fleet-summary { display: flex; gap: 10px; font-size: 12px; color: var(--muted); }
+.fs-idle { color: var(--accent); font-weight: 700; }
+.fleet-card {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: pointer;
+}
+.fleet-card[data-status='drive'], .fleet-card[data-status='drive_empty'],
+.fleet-card[data-status='load'], .fleet-card[data-status='unload'],
+.fleet-card[data-status='break'], .fleet-card[data-status='rest'] { border-left-color: var(--info); }
+.fleet-card.is-idle { border-left-color: var(--accent); background: linear-gradient(90deg, rgba(245, 165, 36, 0.09), var(--panel-2) 60%); }
+.fleet-card.is-incident { border-left-color: var(--bad); }
+.fleet-card.selected { border-top-color: var(--text); border-right-color: var(--text); border-bottom-color: var(--text); }
+.fc-head { display: flex; align-items: center; gap: 12px; }
+.fc-no {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  font-weight: 700;
+  background: var(--line-strong);
+  color: var(--text);
+}
+.fleet-card.is-idle .fc-no { background: var(--accent); color: var(--accent-ink); }
+.fleet-card.is-incident .fc-no { background: var(--bad); color: #fff; }
+.fc-who { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.fc-driver { font-size: 13px; color: var(--muted); line-height: 1.3; }
+.fc-driver strong { font-size: 17px; font-weight: 700; color: var(--text); margin-right: 6px; }
+.fc-truck { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.fc-wear { width: 44px; height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.fc-wear > span { display: block; height: 100%; }
+.fc-pill {
+  flex: none;
+  font-family: var(--font-cond);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  animation: idle-pulse 1.6s ease-in-out infinite alternate;
+}
+@keyframes idle-pulse { to { box-shadow: 0 0 0 5px rgba(245, 165, 36, 0.18); } }
+@media (prefers-reduced-motion: reduce) { .fc-pill { animation: none; } }
+.fc-status { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 8px; background: rgba(255, 255, 255, 0.025); }
+.fc-status .progress { margin: 0; }
+.fc-status-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.fc-small { font-size: 12px; }
+.fc-idle { background: rgba(245, 165, 36, 0.08); }
+.fc-idle-cost { font-size: 12px; color: var(--accent); }
+.fc-incident { background: rgba(242, 85, 90, 0.08); }
+.fc-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+.fc-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fc-traits { flex: 1; display: flex; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.fc-trait { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.fc-trait.good { color: var(--good); }
+.fc-trait.bad { color: var(--bad); }
+.fc-details { border-top: 1px dashed var(--line-strong); padding-top: 10px; display: flex; flex-direction: column; gap: 10px; cursor: default; }
+.fc-stats { display: flex; flex-direction: column; gap: 5px; }
+.fc-stat { display: grid; grid-template-columns: 104px minmax(0, 1fr) 28px; align-items: center; gap: 8px; font-size: 12px; }
+.fc-stat-name { color: var(--muted); }
+.fc-stat-bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.fc-stat-bar > span { display: block; height: 100%; }
+.fc-stat-val { text-align: right; }
+.fc-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: 12px; }
+.fc-facts dt { color: var(--muted); }
+.fc-facts dd { margin: 0; }
+.fc-details .quirk { margin: 0; }
 
 /* ── Giełda ────────────────────────────────────────── */
 .job { border-bottom: 1px solid var(--line); padding: 10px 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; }
@@ -424,5 +492,4 @@ select {
   }
   .panel-head { flex-wrap: wrap; row-gap: 8px; }
   .panel-head select { flex: 1 1 100%; }
-  .grid[data-tab] .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 8px; }
 }

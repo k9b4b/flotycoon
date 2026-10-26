@@ -25,6 +25,12 @@ export const PHASE_LABEL: Record<TruckStatus, string> = {
 export interface TruckView {
   truck: Truck;
   driver: Driver;
+  /** Numer zestawu w firmie (#1, #2…), stały: ten sam na karcie i na mapie. */
+  fleetNo: number;
+  /** Od kiedy zestaw stoi bez zlecenia (tylko gdy status = idle). */
+  idleSince?: number;
+  /** Koszt stały zestawu na godzinę: pensja + leasing. */
+  costPerHour: number;
   status: TruckStatus;
   serviceUntil?: number;
   serviceQuote: { cost: number; durationMin: number; wearAfter: number };
@@ -71,15 +77,21 @@ function lerp(a: number, b: number, f: number) {
   return a + (b - a) * f;
 }
 
-function truckView(s: GameState, truck: Truck): TruckView {
+function truckView(s: GameState, truck: Truck, fleetNo: number): TruckView {
   const driver = s.drivers.find((d) => d.id === truck.driverId)!;
+  const base = { truck, driver, fleetNo, costPerHour: (driver.salaryPerDay + truck.leasePerDay) / 24 };
   const here = CITY_BY_ID[truck.cityId];
   const serviceQuoteNow = serviceQuote(truck);
   if (truck.serviceUntil !== null) {
-    return { truck, driver, status: 'service', statusLabel: PHASE_LABEL.service, lat: here.lat, lon: here.lon, serviceUntil: truck.serviceUntil, serviceQuote: serviceQuoteNow };
+    return { ...base, status: 'service', statusLabel: PHASE_LABEL.service, lat: here.lat, lon: here.lon, serviceUntil: truck.serviceUntil, serviceQuote: serviceQuoteNow };
   }
   if (!truck.tripId) {
-    return { truck, driver, status: 'idle', statusLabel: PHASE_LABEL.idle, lat: here.lat, lon: here.lon, serviceQuote: serviceQuoteNow };
+    return {
+      ...base,
+      // Koniec ostatniego kursu (licznik tachografu) albo dzień zatrudnienia.
+      idleSince: Math.max(driver.duty.at, driver.hiredAt),
+      status: 'idle',
+      statusLabel: PHASE_LABEL.idle, lat: here.lat, lon: here.lon, serviceQuote: serviceQuoteNow };
   }
   const trip = s.trips[truck.tripId];
   const km = kmAt(trip.phases, s.now);
@@ -101,8 +113,7 @@ function truckView(s: GameState, truck: Truck): TruckView {
   const phase = phaseAt(trip.phases, s.now);
   const status = phase?.kind ?? 'unload';
   return {
-    truck,
-    driver,
+    ...base,
     status,
     statusLabel: PHASE_LABEL[status],
     lat,
@@ -133,7 +144,7 @@ export function buildSnapshot(s: GameState): Snapshot {
     now: s.now,
     cash: s.cash,
     companyName: s.companyName,
-    fleet: s.trucks.map((t) => truckView(s, t)),
+    fleet: s.trucks.map((t, i) => truckView(s, t, i + 1)),
     market: s.market
       .filter((j) => j.expiresAt > s.now)
       .map((j) => ({ ...j, previews: idle.map((t) => previewJob(s, j, t)) })),

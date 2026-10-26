@@ -23,7 +23,7 @@ export function DriversList({ snap, a, onHire }: { snap: Snapshot; a: FleetActio
         return (
         <article key={d.id} className={`staff-card${truckId ? '' : ' is-free'}`}>
           <div className="staff-head with-avatar">
-            <DriverAvatar d={d} size={44} />
+            <DriverAvatar d={d} size={48} />
             <div className="fc-driver">
               <strong>„{d.nickname}”</strong>
               {d.firstName} {d.lastName}
@@ -73,7 +73,7 @@ export function CandidatesList({ snap, a }: { snap: Snapshot; a: FleetActions })
       {snap.candidates.map((c) => (
         <article key={c.id} className="staff-card">
           <div className="staff-head with-avatar">
-            <DriverAvatar d={c} size={56} />
+            <DriverAvatar d={c} size={64} />
             <div className="fc-driver">
               <strong>„{c.nickname}”</strong>
               {c.firstName} {c.lastName}

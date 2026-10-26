@@ -22,7 +22,7 @@ export function DecisionModal({ d, more, onChoose, onShow }: { d: DecisionView; 
         <h2 id="dec-title">{d.title}</h2>
         <div className="dec-who">
           <span className="fc-id">
-            <DriverAvatar d={d.driver} size={56} />
+            <DriverAvatar d={d.driver} size={64} />
             <span className="fc-no num">{d.fleetNo}</span>
           </span>
           <div>

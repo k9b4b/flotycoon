@@ -1,0 +1,24 @@
+# GraphHopper: konfiguracja do jednorazowego liczenia tras między miastami gry.
+# Uruchamiana przez .github/workflows/routes.yml (albo lokalnie, patrz README).
+graphhopper:
+  datareader.file: data/region.osm.pbf
+  graph.location: data/graph-cache
+  custom_models.directory: tools/routes
+  graph.encoded_values: car_access, car_average_speed, road_class, road_access, max_weight, max_height
+  import.osm.ignored_highways: footway,cycleway,path,pedestrian,steps,bridleway,track,construction
+  prepare.min_network_size: 200
+  profiles:
+    - name: truck
+      custom_model_files: [truck.json]
+  profiles_ch:
+    - profile: truck
+
+server:
+  application_connectors:
+    - type: http
+      port: 8989
+      bind_host: localhost
+  admin_connectors:
+    - type: http
+      port: 8990
+      bind_host: localhost

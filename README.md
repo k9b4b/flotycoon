@@ -79,7 +79,7 @@ Wszystkie liczby balansu są w `data/balance.ts`. Wartości rynkowe (diesel, e-T
 
 ## Świadome uproszczenia prototypu
 
-- Dopóki `src/data/routes.json` jest pusty, dystanse to linia prosta × 1,15, a ciężarówki jadą po liniach prostych. Patrz „Realne trasy” wyżej.
+- Trasy są policzone tylko między 13 miastami MVP. Nowe miasta wymagają ponownego uruchomienia workflow tras (do tego czasu: linia prosta × 1,15).
 - Zestaw = ciągnik + stały kierowca. Brak naczep, ADR, chłodni.
 - Brak bankructwa, kredytu i limitów tygodniowych czasu jazdy.
 

@@ -220,7 +220,7 @@ export function FleetMap({ snap, pace, selectedId, onSelect, preview }: Props) {
           Europa
         </button>
       </div>
-      <div className="map-credit">Dane mapy: Natural Earth</div>
+      <div className="map-credit">Mapa: Natural Earth · Trasy: © OpenStreetMap, GraphHopper</div>
     </div>
   );
 }

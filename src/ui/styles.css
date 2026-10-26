@@ -314,3 +314,90 @@ select {
 .banner .spacer { flex: 1; }
 .empty { color: var(--faint); font-size: 13px; padding: 12px 0; text-align: center; }
 .loading { display: grid; place-items: center; height: 100vh; color: var(--muted); font-family: var(--font-cond); letter-spacing: 0.1em; text-transform: uppercase; }
+
+/* ── Telefon: zakładki zamiast jednej długiej kolumny ───────────── */
+.topbar-cash { display: none; }
+.mobile-only { display: none; }
+.tabbar { display: none; }
+
+@media (max-width: 720px) {
+  .mobile-only { display: inline-block; }
+  .topbar { display: grid; grid-template-columns: auto 1fr auto; align-items: center; }
+  .topbar .brand { grid-column: 1; }
+  .topbar-cash { display: block; grid-column: 2; justify-self: center; font-size: 14px; font-weight: 700; white-space: nowrap; }
+  .topbar .clock .time { font-size: 13px; white-space: nowrap; }
+  .topbar .clock { grid-column: 3; margin-left: 0; }
+  .topbar .speed { grid-column: 1 / -1; }
+  .logo { font-size: 19px; }
+
+  .grid { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+  .grid[data-tab] { display: flex; flex-direction: column; }
+  .grid[data-tab] > * { display: none; }
+  .grid[data-tab='map'] > .area-map,
+  .grid[data-tab='market'] > .area-market,
+  .grid[data-tab='fleet'] > .area-fleet,
+  .grid[data-tab='log'] > .area-log { display: flex; }
+  .grid[data-tab='company'] > .area-kpis { display: grid; }
+  .grid[data-tab='company'] > .area-cash,
+  .grid[data-tab='company'] > .area-costs { display: flex; }
+  .grid[data-tab] .scroll { max-height: none; overflow: visible; }
+
+  .fleet-map { height: min(62dvh, 560px); }
+  .map-legend { gap: 6px 12px; font-size: 11px; }
+  .job .calc { gap: 8px; }
+
+  .tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    display: flex;
+    background: rgba(18, 22, 29, 0.96);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid var(--line-strong);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  .tabbar button {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    padding: 8px 2px 7px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tabbar button.on { color: var(--accent); }
+  .tab-icon { position: relative; display: grid; place-items: center; }
+  .tab-label { font-size: 11px; font-weight: 600; letter-spacing: 0.02em; }
+  .tab-badge {
+    position: absolute;
+    top: -5px;
+    right: -11px;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    border-radius: 9px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font: 700 10px/17px var(--mono);
+    text-align: center;
+  }
+  .toast {
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    left: max(16px, env(safe-area-inset-left, 0px));
+    right: max(16px, env(safe-area-inset-right, 0px));
+    transform: none;
+    max-width: none;
+  }
+  .panel-head { flex-wrap: wrap; row-gap: 8px; }
+  .panel-head select { flex: 1 1 100%; }
+  .grid[data-tab] .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 8px; }
+}

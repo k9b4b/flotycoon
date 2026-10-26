@@ -20,7 +20,13 @@ interface Props {
   selectedId: string | null;
   onSelect: (id: string) => void;
   preview: MapPreview | null;
+  /** Na telefonie mapa jest w zakładce: ukryta nie animuje się, po pokazaniu przelicza rozmiar. */
+  visible?: boolean;
+  /** Prośba o przesunięcie widoku; `n` rośnie przy każdej nowej prośbie. */
+  focus?: MapFocus | null;
 }
+
+export type MapFocus = { kind: 'truck'; id: string; n: number } | { kind: 'preview'; n: number };
 
 /** Maks. czas (ms) ekstrapolacji między widokami z workera. */
 const MAX_EXTRAPOLATE_MS = 600;
@@ -42,7 +48,7 @@ const line = (coords: LngLat[], props: Record<string, unknown>) => ({
   geometry: { type: 'LineString' as const, coordinates: coords },
 });
 
-export function FleetMap({ snap, pace, selectedId, onSelect, preview }: Props) {
+export function FleetMap({ snap, pace, selectedId, onSelect, preview, visible = true, focus = null }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const map = useRef<MapLibreMap | null>(null);
@@ -50,8 +56,8 @@ export function FleetMap({ snap, pace, selectedId, onSelect, preview }: Props) {
   const markers = useRef(new Map<string, { m: Marker; el: HTMLDivElement }>());
   const paths = useRef(new Map<string, TripPath>());
   // Najnowsze dane dla pętli animacji (bez restartowania efektu przy każdym widoku).
-  const live = useRef({ snap, pace, selectedId, at: performance.now() });
-  live.current = { ...live.current, snap, pace, selectedId };
+  const live = useRef({ snap, pace, selectedId, visible, at: performance.now() });
+  live.current = { ...live.current, snap, pace, selectedId, visible };
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
 
@@ -107,7 +113,8 @@ export function FleetMap({ snap, pace, selectedId, onSelect, preview }: Props) {
     let raf = 0;
     const frame = () => {
       raf = requestAnimationFrame(frame);
-      const { snap: s, pace: p, at } = live.current;
+      const { snap: s, pace: p, at, visible: shown } = live.current;
+      if (!shown) return;
       // Szacowany czas gry między widokami: płynny ruch w 60 klatkach.
       const gameNow = s.now + (Math.min(performance.now() - at, MAX_EXTRAPOLATE_MS) / 1000) * p;
       for (const t of s.fleet) {
@@ -205,6 +212,36 @@ export function FleetMap({ snap, pace, selectedId, onSelect, preview }: Props) {
       geometry: { type: 'Polygon', coordinates: [nightPolygon(snap.now)] },
     } as any);
   }, [snap, selectedId, preview]);
+
+  // ── Widoczność i przesuwanie widoku ─────────────────────────────────────
+  useEffect(() => {
+    if (visible) requestAnimationFrame(() => map.current?.resize());
+  }, [visible]);
+
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !focus) return;
+    // Po przełączeniu zakładki kontener dopiero dostaje rozmiar, więc czekamy klatkę.
+    requestAnimationFrame(() => {
+      m.resize();
+      if (focus.kind === 'truck') {
+        const mk = markers.current.get(focus.id);
+        if (mk) m.easeTo({ center: mk.m.getLngLat(), zoom: Math.max(m.getZoom(), 6.5), duration: 700 });
+      } else if (preview) {
+        const p = buildTripPath(preview.originId, preview.job.fromId, preview.job.toId, preview.originId === preview.job.fromId ? 0 : 1, preview.job.km);
+        const lons = p.coords.map((c) => c[0]);
+        const lats = p.coords.map((c) => c[1]);
+        m.fitBounds(
+          [
+            [Math.min(...lons), Math.min(...lats)],
+            [Math.max(...lons), Math.max(...lats)],
+          ],
+          { padding: 48, duration: 700, maxZoom: 8 },
+        );
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.n]);
 
   const fit = (b: typeof PL_BOUNDS) => map.current?.fitBounds(b, { padding: 24, duration: 800 });
 

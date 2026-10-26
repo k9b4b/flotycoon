@@ -10,7 +10,21 @@ function statColor(v: number) {
   return 'var(--bad)';
 }
 
-function TruckCard({ t, now, selected, onSelect, onService }: { t: TruckView; now: number; selected: boolean; onSelect: () => void; onService: () => void }) {
+function TruckCard({
+  t,
+  now,
+  selected,
+  onSelect,
+  onService,
+  onShowOnMap,
+}: {
+  t: TruckView;
+  now: number;
+  selected: boolean;
+  onSelect: () => void;
+  onService: () => void;
+  onShowOnMap: () => void;
+}) {
   const { truck, driver, trip } = t;
   const wearColor = truck.wear > 0.5 ? 'var(--bad)' : truck.wear > 0.3 ? 'var(--accent)' : 'var(--good)';
   return (
@@ -36,6 +50,15 @@ function TruckCard({ t, now, selected, onSelect, onService }: { t: TruckView; no
         <span className="muted">· {pln(driver.salaryPerDay)}/dzień</span>
         <span style={{ flex: 1 }} />
         <span className="muted">{t.statusLabel}</span>
+        <button
+          className="btn small mobile-only"
+          onClick={(e) => {
+            e.stopPropagation();
+            onShowOnMap();
+          }}
+        >
+          Na mapie
+        </button>
       </div>
 
       {trip ? (
@@ -102,12 +125,14 @@ export function FleetPanel({
   onSelect,
   onLease,
   onService,
+  onShowOnMap,
 }: {
   snap: Snapshot;
   selectedId: string | null;
   onSelect: (id: string) => void;
   onLease: () => void;
   onService: (truckId: string) => void;
+  onShowOnMap: (truckId: string) => void;
 }) {
   const leaseCost = BALANCE.hireFee + BALANCE.leaseDeposit;
   return (
@@ -131,6 +156,7 @@ export function FleetPanel({
             selected={t.truck.id === selectedId}
             onSelect={() => onSelect(t.truck.id)}
             onService={() => onService(t.truck.id)}
+            onShowOnMap={() => onShowOnMap(t.truck.id)}
           />
         ))}
       </div>

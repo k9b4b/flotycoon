@@ -1,7 +1,7 @@
 import { formatClock, formatDuration, formatGameTime } from '../../engine/time';
 import { PHASE_LABEL, type Snapshot, type TruckView } from '../../engine/view';
 import { city } from '../format';
-import { FleetMap, type MapPreview } from '../map/FleetMap';
+import { FleetMap, type MapFocus, type MapPreview } from '../map/FleetMap';
 
 const STATUS_COLOR: Record<string, string> = {
   idle: 'var(--good)',
@@ -21,12 +21,16 @@ export function MapPanel({
   selectedId,
   onSelect,
   preview,
+  visible = true,
+  focus = null,
 }: {
   snap: Snapshot;
   pace: number;
   selectedId: string | null;
   onSelect: (id: string) => void;
   preview: MapPreview | null;
+  visible?: boolean;
+  focus?: MapFocus | null;
 }) {
   return (
     <section className="panel area-map">
@@ -37,7 +41,7 @@ export function MapPanel({
           {snap.fleet.filter((t) => t.trip).length} w trasie · {snap.fleet.filter((t) => t.status === 'idle').length} wolnych
         </span>
       </div>
-      <FleetMap snap={snap} pace={pace} selectedId={selectedId} onSelect={onSelect} preview={preview} />
+      <FleetMap snap={snap} pace={pace} selectedId={selectedId} onSelect={onSelect} preview={preview} visible={visible} focus={focus} />
       <div className="map-legend">
         <span><i style={{ background: 'var(--accent)' }} />z ładunkiem</span>
         <span><i style={{ background: 'var(--info)' }} />na pusto / załadunek</span>

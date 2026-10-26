@@ -6,7 +6,8 @@ import { FleetPanel } from './components/FleetPanel';
 import { LogPanel } from './components/LogPanel';
 import { MapPanel } from './components/MapPanel';
 import { MarketPanel } from './components/MarketPanel';
-import type { MapPreview } from './map/FleetMap';
+import type { MapFocus, MapPreview } from './map/FleetMap';
+import { TabBar, useIsMobile, type Tab } from './components/TabBar';
 import { km, pln, plnSigned } from './format';
 import { sim, useSim } from './simClient';
 
@@ -20,6 +21,10 @@ export function App() {
   const [saving, setSaving] = useState(true);
   const [preview, setPreview] = useState<MapPreview | null>(null);
   const timer = useRef<number | undefined>(undefined);
+  const mobile = useIsMobile();
+  const [tab, setTab] = useState<Tab>('map');
+  const [focus, setFocus] = useState<MapFocus | null>(null);
+  const [logSeenAt, setLogSeenAt] = useState(0);
 
   useEffect(() => {
     sim.init().then((r) => {
@@ -39,7 +44,36 @@ export function App() {
     notify(r.ok ? r.message : r.error, !r.ok);
   };
 
+  // Dziennik oglądany na bieżąco: wszystko, co do niego wpada, jest już „przeczytane”.
+  const latestLog = snap?.log[snap.log.length - 1]?.t ?? 0;
+  useEffect(() => {
+    if (mobile && tab === 'log') setLogSeenAt(latestLog);
+  }, [mobile, tab, latestLog]);
+
   if (!snap) return <div className="loading">Rozgrzewanie silnika…</div>;
+
+  const showTruckOnMap = (id: string) => {
+    setSelected(id);
+    setTab('map');
+    setFocus({ kind: 'truck', id, n: (focus?.n ?? 0) + 1 });
+  };
+  const showJobOnMap = (p: MapPreview) => {
+    setPreview(p);
+    setTab('map');
+    setFocus({ kind: 'preview', n: (focus?.n ?? 0) + 1 });
+  };
+  const switchTab = (t: Tab) => {
+    // Podgląd zlecenia z giełdy znika, chyba że właśnie przechodzimy na mapę.
+    if (t !== 'map') setPreview(null);
+    setTab(t);
+    window.scrollTo({ top: 0 });
+  };
+  const freeIds = new Set(snap.fleet.filter((t) => t.status === 'idle').map((t) => t.truck.id));
+  const badges = {
+    market: snap.market.filter((j) => j.previews.some((p) => freeIds.has(p.truckId) && p.onTime && !p.tooFar)).length,
+    fleet: freeIds.size,
+    log: snap.log.filter((e) => e.t > logSeenAt && e.tone !== 'info').length,
+  };
 
   const selectedId = selected ?? snap.fleet[0]?.truck.id ?? null;
   const todayNet = snap.today.revenue - snap.today.costs;
@@ -54,6 +88,7 @@ export function App() {
           </span>
           <span className="company">{snap.companyName}</span>
         </div>
+        <div className={`topbar-cash num ${snap.cash < 0 ? 'bad' : ''}`}>{pln(snap.cash)}</div>
         <div className="clock">
           <div className="time">{formatGameTime(snap.now, true)}</div>
           <div className="label">czas gry</div>
@@ -81,7 +116,7 @@ export function App() {
         </div>
       )}
 
-      <main className="grid">
+      <main className="grid" data-tab={mobile ? tab : undefined}>
         <div className="kpis area-kpis">
           <div className="kpi">
             <div className="label">Gotówka</div>
@@ -117,14 +152,37 @@ export function App() {
           </div>
         </div>
 
-        <MapPanel snap={snap} pace={pace} selectedId={selectedId} onSelect={setSelected} preview={preview} />
-        <MarketPanel snap={snap} truckId={selectedId} onTruck={setSelected} onAccept={(j, t) => run(sim.acceptJob(j, t))} onPreview={setPreview} />
-        <FleetPanel snap={snap} selectedId={selectedId} onSelect={setSelected} onLease={() => run(sim.leaseTruck())} onService={(id) => run(sim.serviceTruck(id))} />
+        <MapPanel
+          snap={snap}
+          pace={pace}
+          selectedId={selectedId}
+          onSelect={setSelected}
+          preview={preview}
+          visible={!mobile || tab === 'map'}
+          focus={focus}
+        />
+        <MarketPanel
+          snap={snap}
+          truckId={selectedId}
+          onTruck={setSelected}
+          onAccept={(j, t) => run(sim.acceptJob(j, t))}
+          onPreview={mobile ? () => {} : setPreview}
+          onShowOnMap={showJobOnMap}
+        />
+        <FleetPanel
+          snap={snap}
+          selectedId={selectedId}
+          onSelect={setSelected}
+          onLease={() => run(sim.leaseTruck())}
+          onService={(id) => run(sim.serviceTruck(id))}
+          onShowOnMap={showTruckOnMap}
+        />
         <CashChart snap={snap} />
         <CostBreakdown snap={snap} />
         <LogPanel snap={snap} />
       </main>
 
+      {mobile && <TabBar tab={tab} onTab={switchTab} badges={badges} />}
       {toast && <div className={`toast${toast.bad ? ' bad' : ''}`}>{toast.text}</div>}
     </div>
   );

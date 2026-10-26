@@ -15,7 +15,8 @@ interface RouteEntry {
   coords: LngLat[];
 }
 
-const ROUTES = (routesData as { routes: Record<string, RouteEntry> }).routes;
+// JSON importuje współrzędne jako number[][], więc rzutujemy przez unknown na krotki [lon, lat].
+const ROUTES = (routesData as unknown as { routes: Record<string, RouteEntry> }).routes;
 
 export const routeKey = (a: string, b: string) => (a < b ? `${a}-${b}` : `${b}-${a}`);
 

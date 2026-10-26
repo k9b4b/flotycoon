@@ -9,12 +9,14 @@ export function MarketPanel({
   onTruck,
   onAccept,
   onPreview,
+  onShowOnMap,
 }: {
   snap: Snapshot;
   truckId: string | null;
   onTruck: (id: string) => void;
   onAccept: (jobId: string, truckId: string) => void;
   onPreview: (p: MapPreview | null) => void;
+  onShowOnMap: (p: MapPreview) => void;
 }) {
   const free = snap.fleet.filter((t) => t.status === 'idle');
   const active = free.find((t) => t.truck.id === truckId) ?? free[0];
@@ -97,6 +99,15 @@ export function MarketPanel({
                   </>
                 )}
                 <span style={{ flex: 1 }} />
+                <button
+                  className="btn small mobile-only"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onShowOnMap({ job: j, originId: active?.truck.cityId ?? j.fromId });
+                  }}
+                >
+                  Na mapie
+                </button>
                 <button className="btn small primary" disabled={!p || p.tooFar} onClick={(e) => {
                     e.stopPropagation();
                     onPreview(null);

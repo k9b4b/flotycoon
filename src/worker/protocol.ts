@@ -18,6 +18,8 @@ export interface SimApi {
   upgradeYard(): ActionResult;
   buyUpgrade(id: UpgradeId): ActionResult;
   setAutoDispatch(on: boolean): ActionResult;
+  resolveDecision(decisionId: string, optionId: string): ActionResult;
+  setAskDecisions(on: boolean): ActionResult;
   newGame(seed?: number): void;
   save(): Promise<boolean>;
 }

@@ -16,16 +16,18 @@ import {
 } from './company';
 import { driverName, earn, fmtPLN, g, log, newId, spend, type ActionResult } from './core';
 import { planTrip, type Leg } from './drivingRules';
-import { clamp, driverSpeedKmh, rollIncidents, tripCosts } from './effects';
+import { clamp, driverSpeedKmh, perkMods, rollIncidents, tripCosts } from './effects';
 import { createQueue, qPeek, qPop, qPush } from './queue';
 import { chance, createRng, pick, pickWeighted, rand, randInt, randRange } from './rng';
+import { ROAD_EVENTS, ROAD_EVENT_BY_ID, eventCtx, optionLabel, type Outcome } from './roadEvents';
 import { roadKm } from './routes';
 import { MIN_PER_HOUR, dayIndex, formatDuration, formatGameTime, nextMidnight } from './time';
-import { SAVE_VERSION, type Driver, type GameEvent, type GameState, type Job, type Trip, type Truck } from './types';
+import { SAVE_VERSION, type Driver, type GameEvent, type GameState, type IncidentInfo, type Job, type PendingDecision, type Phase, type Trip, type Truck } from './types';
 
 // Ponowny eksport, żeby UI, worker i narzędzia miały jedno miejsce importu.
 export { driverName, fmtPLN, g, log, type ActionResult };
 export * from './company';
+export { ROAD_EVENTS, ROAD_EVENT_BY_ID, eventCtx } from './roadEvents';
 
 // ─── Dostępność ──────────────────────────────────────────────────────────────
 
@@ -127,6 +129,8 @@ export function newGame(seed: number): GameState {
     base: { yard: 0, workshop: false, office: false, dispatcher: false, autoDispatch: false },
     candidates: [],
     truckOffers: [],
+    settings: { askDecisions: true },
+    decisions: [],
   };
   const d = generateDriver(s);
   // Pierwszy kierowca jest trochę lepszy, żeby start nie był karą.
@@ -230,14 +234,128 @@ export function acceptJob(s: GameState, jobId: string, truckId: string): ActionR
   s.market = s.market.filter((j) => j.id !== jobId);
   qPush(s.queue, trip.eta, { type: 'TRIP_DONE', tripId: trip.id });
   phases.forEach((p, i) => {
-    if (p.kind === 'incident') qPush(s.queue, p.start, { type: 'TRIP_INCIDENT', tripId: trip.id, phaseIdx: i });
+    if (p.kind !== 'incident' || !p.incident) return;
+    p.incident.id = `${trip.id}:${i}`;
+    qPush(s.queue, p.start, { type: 'TRIP_INCIDENT', tripId: trip.id, incId: p.incident.id });
   });
+  scheduleRoadEvent(s, trip);
   const from = CITY_BY_ID[job.fromId].name;
   const to = CITY_BY_ID[job.toId].name;
   const via = emptyKm > 0 ? ` (najpierw ${emptyKm} km na pusto z ${CITY_BY_ID[truck.cityId].gen})` : '';
   const msg = `${driver.nickname} rusza: ${from} → ${to}${via}. ${job.cargo}.`;
   log(s, 'info', msg);
   return { ok: true, message: msg };
+}
+
+// ─── Zdarzenia z decyzją ────────────────────────────────────────────────────
+
+/** Czasem coś się wydarzy w trakcie jazdy: losujemy moment w jednej z faz jazdy. */
+function scheduleRoadEvent(s: GameState, trip: Trip) {
+  const totalKm = trip.emptyKm + trip.job.km;
+  if (!chance(s.rng, BALANCE.roadEventChance * Math.min(1.4, totalKm / 350))) return;
+  const drives = trip.phases.filter((p) => (p.kind === 'drive' || p.kind === 'drive_empty') && p.end - p.start > 20);
+  if (drives.length === 0) return;
+  const ph = pickWeighted(s.rng, drives, (p) => p.end - p.start);
+  qPush(s.queue, ph.start + randRange(s.rng, 0.15, 0.85) * (ph.end - ph.start), { type: 'ROAD_EVENT', tripId: trip.id });
+}
+
+/**
+ * Wstawia postój do harmonogramu kursu w chwili `at`: bieżąca faza się dzieli,
+ * a wszystko później przesuwa się o `min`. Zdarzenia w kolejce same się przeplanują.
+ */
+export function delayTrip(trip: Trip, at: number, min: number, info: IncidentInfo) {
+  if (min <= 0) return;
+  const out: Phase[] = [];
+  let done = false;
+  for (const p of trip.phases) {
+    if (done) out.push({ ...p, start: p.start + min, end: p.end + min });
+    else if (p.end <= at) out.push(p);
+    else {
+      const km = p.start < at ? p.km0 + ((p.km1 - p.km0) * (at - p.start)) / (p.end - p.start) : p.km0;
+      if (p.start < at) out.push({ ...p, end: at, km1: km });
+      out.push({ kind: 'incident', start: at, end: at + min, km0: km, km1: km, incident: info });
+      out.push({ ...p, start: Math.max(p.start, at) + min, end: p.end + min, km0: km });
+      done = true;
+    }
+  }
+  if (!done) {
+    const last = out[out.length - 1];
+    out.push({ kind: 'incident', start: at, end: at + min, km0: last?.km1 ?? 0, km1: last?.km1 ?? 0, incident: info });
+  }
+  trip.phases = out;
+  trip.eta = out[out.length - 1].end;
+  trip.dutyAfter = { ...trip.dutyAfter, at: trip.dutyAfter.at + min };
+}
+
+function onRoadEvent(s: GameState, tripId: string, interactive: boolean) {
+  const trip = s.trips[tripId];
+  if (!trip) return;
+  const d = s.drivers.find((x) => x.id === trip.driverId);
+  const t = s.trucks.find((x) => x.id === trip.truckId);
+  if (!d || !t) return;
+  const def = pickWeighted(s.rng, ROAD_EVENTS, (e) => e.weight);
+  const vars = def.init?.(eventCtx(s, trip, d, t, {})) ?? {};
+  const dec: PendingDecision = { id: newId(s, 'e'), eventId: def.id, tripId, driverId: d.id, truckId: t.id, at: s.now, vars };
+  if (interactive && s.settings.askDecisions) s.decisions.push(dec);
+  else applyDecision(s, dec, null);
+}
+
+const effectSummary = (o: Outcome) =>
+  [
+    o.delayMin ? `+${formatDuration(o.delayMin)}` : '',
+    o.cost ? `−${fmtPLN(o.cost)}` : '',
+    o.payment ? `${o.payment > 0 ? '+' : '−'}${fmtPLN(Math.abs(o.payment))} frachtu` : '',
+    o.fuelSaving ? `−${fmtPLN(o.fuelSaving)} na paliwie` : '',
+    o.deadline ? `termin +${formatDuration(o.deadline)}` : '',
+    o.morale ? `morale ${o.morale > 0 ? '+' : ''}${o.morale}` : '',
+    o.rep ? `reputacja ${o.rep > 0 ? '+' : ''}${o.rep}` : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
+
+/** Rozstrzyga zdarzenie: optionId od gracza albo null (kierowca decyduje sam). */
+function applyDecision(s: GameState, dec: PendingDecision, optionId: string | null): ActionResult {
+  s.decisions = s.decisions.filter((x) => x.id !== dec.id);
+  const trip = s.trips[dec.tripId];
+  const d = s.drivers.find((x) => x.id === dec.driverId);
+  const t = s.trucks.find((x) => x.id === dec.truckId);
+  const def = ROAD_EVENT_BY_ID[dec.eventId];
+  if (!trip || !d || !t || !def) return { ok: false, error: 'To zdarzenie już się nie liczy.' };
+  const c = eventCtx(s, trip, d, t, dec.vars);
+  const byDriver = optionId === null;
+  const opt = def.options.find((o) => o.id === (optionId ?? def.auto(c))) ?? def.options[0];
+  const o = opt.resolve(c);
+  if (o.delayMin) delayTrip(trip, s.now, o.delayMin, { kind: 'event', text: `${def.title}: ${o.text}`, cost: o.cost ?? 0, tone: o.tone });
+  if (o.cost) spend(s, o.cost, o.costCat ?? 'repairs');
+  if (o.payment) trip.job = { ...trip.job, payment: Math.max(0, trip.job.payment + o.payment) };
+  if (o.fuelSaving) trip.fuelCost = Math.max(0, trip.fuelCost - o.fuelSaving);
+  if (o.deadline) trip.job = { ...trip.job, deadline: trip.job.deadline + o.deadline };
+  if (o.morale) d.stats.morale = clamp(d.stats.morale + o.morale);
+  if (o.wear) t.wear = clamp(t.wear + o.wear, 0, 1);
+  if (o.rep) addReputation(s, o.rep);
+  const who = byDriver ? ` ${d.nickname} zdecydował${g(d)} sam${g(d)}: „${optionLabel(opt, c)}”.` : '';
+  const fx = effectSummary(o);
+  const msg = `${def.title}.${who} ${o.text}${fx ? ` (${fx})` : ''}`;
+  log(s, o.tone, msg);
+  return { ok: true, message: msg };
+}
+
+/** Gracz wybiera opcję w oknie zdarzenia. */
+export function resolveDecision(s: GameState, decisionId: string, optionId: string): ActionResult {
+  const dec = s.decisions.find((x) => x.id === decisionId);
+  if (!dec) return { ok: false, error: 'To zdarzenie już się rozstrzygnęło.' };
+  return applyDecision(s, dec, optionId);
+}
+
+/** Wszystkie czekające decyzje podejmują kierowcy (np. gracz zamknął kartę albo wyłączył pytania). */
+export function autoResolveAll(s: GameState) {
+  for (const dec of [...s.decisions]) applyDecision(s, dec, null);
+}
+
+export function setAskDecisions(s: GameState, on: boolean): ActionResult {
+  s.settings.askDecisions = on;
+  if (!on) autoResolveAll(s);
+  return { ok: true, message: on ? 'Kierowcy będą dzwonić z każdą decyzją na trasie.' : 'Kierowcy decydują sami. Szef ma święty spokój (prawie).' };
 }
 
 export function serviceQuote(s: GameState, t: Truck) {
@@ -326,19 +444,30 @@ function dispatch(s: GameState) {
 
 // ─── Obsługa zdarzeń ─────────────────────────────────────────────────────────
 
-function onTripIncident(s: GameState, tripId: string, phaseIdx: number) {
-  const trip = s.trips[tripId];
-  const info = trip?.phases[phaseIdx]?.incident;
-  if (!trip || !info) return;
+function onTripIncident(s: GameState, ev: Extract<GameEvent, { type: 'TRIP_INCIDENT' }>) {
+  const trip = s.trips[ev.tripId];
+  if (!trip) return;
+  const phaseIdx = ev.incId ? trip.phases.findIndex((p) => p.incident?.id === ev.incId) : (ev.phaseIdx ?? -1);
+  const info = trip.phases[phaseIdx]?.incident;
+  if (!info) return;
+  // Harmonogram przesunęła decyzja na trasie: zdarzenie wypadnie później.
+  if (trip.phases[phaseIdx].start > s.now + 1e-6) {
+    qPush(s.queue, trip.phases[phaseIdx].start, ev);
+    return;
+  }
   if (info.cost > 0) spend(s, info.cost, info.kind === 'breakdown' ? 'repairs' : 'fines');
   if (info.kind === 'itd' && info.cost > 0) addReputation(s, REPUTATION.itdFine);
   const delay = formatDuration(trip.phases[phaseIdx].end - trip.phases[phaseIdx].start);
   log(s, info.tone, `${info.text} (+${delay}${info.cost > 0 ? `, −${fmtPLN(info.cost)}` : ''})`);
 }
 
-function onTripDone(s: GameState, tripId: string) {
+function onTripDone(s: GameState, tripId: string): boolean {
   const trip = s.trips[tripId];
-  if (!trip) return;
+  if (!trip) return false;
+  if (trip.eta > s.now + 1e-6) {
+    qPush(s.queue, trip.eta, { type: 'TRIP_DONE', tripId });
+    return false;
+  }
   const truck = s.trucks.find((t) => t.id === trip.truckId)!;
   const driver = s.drivers.find((d) => d.id === trip.driverId);
   const job = trip.job;
@@ -355,7 +484,7 @@ function onTripDone(s: GameState, tripId: string) {
 
   truck.cityId = job.toId;
   truck.odometerKm += totalKm;
-  truck.wear = clamp(truck.wear + totalKm * BALANCE.wearPerKm, 0, 1);
+  truck.wear = clamp(truck.wear + totalKm * BALANCE.wearPerKm * (driver ? perkMods(driver).wearMul : 1), 0, 1);
   truck.tripId = null;
 
   if (driver) {
@@ -363,7 +492,7 @@ function onTripDone(s: GameState, tripId: string) {
     driver.kmDriven += totalKm;
     driver.jobsDone += 1;
     driver.stats.experience = clamp(driver.stats.experience + ((100 - driver.stats.experience) * totalKm) / 60_000);
-    driver.stats.morale = clamp(driver.stats.morale + (lateMin > 0 ? -BALANCE.lateMoraleHit : BALANCE.onTimeMoraleGain));
+    driver.stats.morale = clamp(driver.stats.morale + (lateMin > 0 ? -BALANCE.lateMoraleHit * perkMods(driver).lateMoraleMul : BALANCE.onTimeMoraleGain));
   }
 
   s.totals.jobsDone += 1;
@@ -376,7 +505,7 @@ function onTripDone(s: GameState, tripId: string) {
     if (driver) driver.lateJobs += 1;
     s.totals.lateJobs += 1;
     log(s, 'bad', `${nick} spóźnił${driver ? g(driver) : ''} się ${formatDuration(lateMin)} do ${city}. Kara ${fmtPLN(penalty)}. „Korki były”. Na czysto: ${fmtPLN(net)}.`);
-    addReputation(s, REPUTATION.late);
+    addReputation(s, REPUTATION.late + (driver ? perkMods(driver).repLate : 0));
   } else {
     if (overMin > 0) {
       log(s, 'funny', `${nick} ${driver?.female ? 'dojechała' : 'dojechał'} do ${city} ${formatDuration(overMin)} po terminie. Magazynier westchnął, ale podpisał bez kary. Na czysto: ${fmtPLN(net)}.`);
@@ -385,12 +514,13 @@ function onTripDone(s: GameState, tripId: string) {
     }
     const urgent = job.cargo.includes('PILNE') ? REPUTATION.urgentBonus : 0;
     const long = job.km > 400 ? REPUTATION.longHaulBonus : 0;
-    addReputation(s, REPUTATION.onTime + urgent + long);
+    addReputation(s, REPUTATION.onTime + urgent + long + (driver ? perkMods(driver).repOnTime : 0));
   }
   delete s.trips[tripId];
   // Spedytor od razu szuka ładunku powrotnego z miejsca rozładunku.
   const backloads = BALANCE.backloadOffers + (s.base.office ? OFFICE.extraBackload : 0);
   for (let i = 0; i < backloads; i++) s.market.push(generateJob(s, job.toId));
+  return true;
 }
 
 function onDaily(s: GameState) {
@@ -402,7 +532,8 @@ function onDaily(s: GameState) {
   if (base > 0) spend(s, base, 'base');
   // Morale wraca powoli do normy: dobra passa i kryzys mijają, jeśli nic ich nie podtrzymuje.
   for (const d of s.drivers) {
-    d.stats.morale = clamp(d.stats.morale + (BALANCE.moraleBaseline - d.stats.morale) * BALANCE.moraleReversion);
+    const target = clamp(BALANCE.moraleBaseline + perkMods(d).moraleTarget);
+    d.stats.morale = clamp(d.stats.morale + (target - d.stats.morale) * BALANCE.moraleReversion);
     // Bezczynność (bez auta albo z autem na placu) nudzi.
     const t = truckOfDriver(s, d);
     if (!t || !t.tripId) d.stats.morale = clamp(d.stats.morale + BALANCE.idleMoraleDrift);
@@ -415,15 +546,16 @@ function onDaily(s: GameState) {
   qPush(s.queue, nextMidnight(s.now), { type: 'DAILY' });
 }
 
-function handle(s: GameState, ev: GameEvent) {
+function handle(s: GameState, ev: GameEvent, interactive: boolean) {
   switch (ev.type) {
     case 'TRIP_DONE':
-      onTripDone(s, ev.tripId);
       // Halina reaguje od razu, nie czeka na swój cykl.
-      if (s.base.dispatcher && s.base.autoDispatch) dispatch(s);
+      if (onTripDone(s, ev.tripId) && s.base.dispatcher && s.base.autoDispatch) dispatch(s);
       return;
     case 'TRIP_INCIDENT':
-      return onTripIncident(s, ev.tripId, ev.phaseIdx);
+      return onTripIncident(s, ev);
+    case 'ROAD_EVENT':
+      return onRoadEvent(s, ev.tripId, interactive);
     case 'SERVICE_DONE': {
       const t = s.trucks.find((x) => x.id === ev.truckId);
       if (!t) return;
@@ -450,14 +582,23 @@ function handle(s: GameState, ev: GameEvent) {
   }
 }
 
-/** Przesuwa zegar do `target`, wykonując po drodze wszystkie zaplanowane zdarzenia. */
-export function advanceTo(s: GameState, target: number): number {
+/**
+ * Przesuwa zegar do `target`, wykonując po drodze wszystkie zaplanowane zdarzenia.
+ * interactive = gracz patrzy: zdarzenie z decyzją zatrzymuje zegar, dopóki gracz nie wybierze.
+ * W przeciwnym razie (tło, nadrabianie, testy) decydują kierowcy.
+ */
+export function advanceTo(s: GameState, target: number, interactive = false): number {
+  if (s.decisions.length > 0) {
+    if (interactive) return 0;
+    autoResolveAll(s);
+  }
   let processed = 0;
   for (let next = qPeek(s.queue); next && next.at <= target; next = qPeek(s.queue)) {
     qPop(s.queue);
     s.now = Math.max(s.now, next.at);
-    handle(s, next.ev);
+    handle(s, next.ev, interactive);
     processed++;
+    if (interactive && s.decisions.length > 0) return processed;
   }
   s.now = Math.max(s.now, target);
   return processed;

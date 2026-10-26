@@ -1,4 +1,5 @@
 import { YARD } from '../data/progression';
+import { rollPerks } from './company';
 import { qPush } from './queue';
 import { SAVE_VERSION, type GameState } from './types';
 
@@ -28,6 +29,21 @@ const MIGRATIONS: Record<number, (s: any) => any> = {
     qPush(out.queue, s.now, { type: 'CANDIDATES_REFRESH' });
     qPush(out.queue, s.now, { type: 'OFFERS_REFRESH' });
     return out;
+  },
+  // 2 → 3: perki kierowców i zdarzenia z decyzją gracza.
+  2: (s) => {
+    const withPerks = (d: any) => ({
+      ...d,
+      perks: d.perks ?? rollPerks(s.rng, (d.stats.experience + d.stats.eco + d.stats.reliability + d.stats.stamina) / 4),
+    });
+    return {
+      ...s,
+      version: 3,
+      drivers: s.drivers.map(withPerks),
+      candidates: s.candidates.map(withPerks),
+      settings: { askDecisions: true },
+      decisions: [],
+    };
   },
 };
 

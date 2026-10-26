@@ -1,6 +1,7 @@
 import { BALANCE } from '../data/balance';
 import { HOME_BASE } from '../data/cities';
 import { FEMALE_NAMES, LAST_NAMES, MALE_NAMES, NICKNAMES, QUIRKS, TRUCK_MODELS } from '../data/flavor';
+import { PERKS, PERK_BY_ID, PERK_SALARY, type PerkId } from '../data/perks';
 import { EXTRA_DRIVERS, MARKETS, RANKS, UPGRADES, WORKSHOP, YARD, type UpgradeId } from '../data/progression';
 import { driverName, fmtPLN, g, log, newId, spend, type ActionResult } from './core';
 import { FRESH_DUTY } from './drivingRules';
@@ -49,6 +50,28 @@ function randomPlate(r: RngState): string {
   return `WX ${randInt(r, 10, 99)}${l()}${l()}${randInt(r, 1, 9)}`;
 }
 
+/**
+ * Perki zależą od jakości kierowcy (średnia statystyk 0–100):
+ * słaby ma 1–2 perki, głównie negatywne; świetny 2–3, głównie pozytywne, czasem rzadkie.
+ */
+export function rollPerks(r: RngState, quality: number): PerkId[] {
+  const count = 1 + (chance(r, 0.5) ? 1 : 0) + (quality >= 70 && chance(r, 0.5) ? 1 : 0);
+  const pGood = clamp(0.15 + ((quality - 20) / 75) * 0.75, 0.1, 0.9);
+  const out: PerkId[] = [];
+  for (let i = 0; i < count; i++) {
+    const tone = chance(r, 0.15) ? 'mixed' : chance(r, pGood) ? 'good' : 'bad';
+    const pool = PERKS.filter(
+      (p) =>
+        p.tone === tone &&
+        (!p.rare || quality >= 65) &&
+        !out.includes(p.id) &&
+        !out.some((o) => p.excludes?.includes(o) || PERK_BY_ID[o].excludes?.includes(p.id)),
+    );
+    if (pool.length > 0) out.push(pick(r, pool).id);
+  }
+  return out;
+}
+
 /** Kandydat na kierowcę. Wyższa ranga = lepszy przekrój statystyk na rynku. */
 export function generateDriver(s: GameState, prefix = 'd'): Driver {
   const r = s.rng;
@@ -62,6 +85,8 @@ export function generateDriver(s: GameState, prefix = 'd'): Driver {
   const stats = { experience: stat(), eco: stat(), reliability: stat(), stamina: stat(), morale: randInt(r, 55, 80) };
   // Dobry kierowca wie, ile jest wart: oczekiwania płacowe rosną ze statystykami.
   const quality = (stats.experience + stats.eco + stats.reliability + stats.stamina) / 4;
+  const perks = rollPerks(r, quality);
+  const perkPay = perks.reduce((a, id) => a + PERK_SALARY[PERK_BY_ID[id].tone], 0);
   return {
     id: newId(s, prefix),
     firstName: pick(r, female ? FEMALE_NAMES : MALE_NAMES),
@@ -70,7 +95,8 @@ export function generateDriver(s: GameState, prefix = 'd'): Driver {
     nickname: pick(r, NICKNAMES),
     quirk: pick(r, QUIRKS),
     stats,
-    salaryPerDay: Math.round(300 + quality * 2.6 + randInt(r, 0, 40)),
+    perks,
+    salaryPerDay: Math.round(300 + quality * 2.6 + perkPay + randInt(r, 0, 40)),
     hiredAt: s.now,
     kmDriven: 0,
     jobsDone: 0,

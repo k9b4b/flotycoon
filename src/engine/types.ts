@@ -1,8 +1,9 @@
+import type { PerkId } from '../data/perks';
 import type { DutyState } from './drivingRules';
 import type { Queue } from './queue';
 import type { RngState } from './rng';
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 /** Wszystkie statystyki 0–100. Każda na coś wpływa (patrz engine/effects.ts). */
 export interface DriverStats {
@@ -21,6 +22,8 @@ export interface Driver {
   nickname: string;
   quirk: string;
   stats: DriverStats;
+  /** Cechy specjalne (data/perks.ts). */
+  perks: PerkId[];
   salaryPerDay: number;
   hiredAt: number;
   kmDriven: number;
@@ -89,7 +92,9 @@ export interface Job {
 export type PhaseKind = 'drive_empty' | 'load' | 'drive' | 'break' | 'rest' | 'unload' | 'incident';
 
 export interface IncidentInfo {
-  kind: 'traffic' | 'breakdown' | 'itd' | 'overslept';
+  kind: 'traffic' | 'breakdown' | 'itd' | 'overslept' | 'event';
+  /** Identyfikator do zdarzenia w kolejce (harmonogram może się przesunąć). */
+  id?: string;
   text: string;
   cost: number;
   tone: LogTone;
@@ -141,7 +146,8 @@ export interface DayRecord {
 
 export type GameEvent =
   | { type: 'TRIP_DONE'; tripId: string }
-  | { type: 'TRIP_INCIDENT'; tripId: string; phaseIdx: number }
+  | { type: 'TRIP_INCIDENT'; tripId: string; phaseIdx?: number; incId?: string }
+  | { type: 'ROAD_EVENT'; tripId: string }
   | { type: 'SERVICE_DONE'; truckId: string }
   | { type: 'MARKET_REFRESH' }
   | { type: 'DAILY' }
@@ -173,4 +179,23 @@ export interface GameState {
   candidates: Driver[];
   /** Oferty salonu (leasing). */
   truckOffers: TruckOffer[];
+  settings: GameSettings;
+  /** Zdarzenia na trasie czekające na decyzję gracza (zegar stoi, dopóki ich nie rozstrzygnie). */
+  decisions: PendingDecision[];
+}
+
+export interface GameSettings {
+  /** true: zdarzenia w trakcie gry zatrzymują zegar i pytają gracza; false: kierowcy decydują sami. */
+  askDecisions: boolean;
+}
+
+export interface PendingDecision {
+  id: string;
+  eventId: string;
+  tripId: string;
+  driverId: string;
+  truckId: string;
+  at: number;
+  /** Liczby wylosowane przy zdarzeniu (np. miasto, stawka), żeby opis i wynik się zgadzały. */
+  vars: Record<string, number | string>;
 }

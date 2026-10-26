@@ -84,6 +84,8 @@ Przy obecnym balansie prosty bot dochodzi do „Przewoźnika krajowego” po ok.
 ## Co już jest w symulacji
 
 - **Kierowca:** doświadczenie (prędkość), eco-driving (spalanie), niezawodność (kontrole ITD), kondycja (ryzyko zaspania), morale (mnożnik niezawodności, spada przy spóźnieniach i bezczynności). Pensja dzienna, przebieg, licznik czasu jazdy przechodzący między kursami.
+- **Perki kierowców** (`data/perks.ts`): 1–3 cechy specjalne obok statystyk, np. „Złota rączka” (awarie o połowę rzadziej), „Zna skróty”, „Ulubieniec magazynierów” (+1 reputacji za terminowy kurs), „Ciężka noga”, „Zapominalski”, „Pirat drogowy” (szybciej, ale więcej mandatów). Im lepszy kierowca, tym więcej perków i większa szansa, że są pozytywne; perki zmieniają też oczekiwaną pensję. Działają w `engine/effects.ts` (`perkMods`).
+- **Zdarzenia z decyzją** (`engine/roadEvents.ts`): karambol, kontrola ITD bez papierów, kontrolka silnika, zmęczenie, dodatkowy rozładunek, grzechot w naczepie, tania stacja, pies na MOP-ie. Gdy gracz patrzy, kierowca „dzwoni”, a zegar gry czeka na wybór. W tle i podczas nieobecności kierowca decyduje sam według swoich perków i statystyk (to samo można włączyć na stałe w zakładce Firma). Wynik wstawia postój do harmonogramu kursu (`delayTrip`), a zdarzenia w kolejce same się przeplanowują.
 - **Ciągnik:** marka i model, norma Euro (myto), spalanie, przebieg, zużycie (awarie, spalanie), leasing, serwis.
 - **Przepisy:** 4,5 h jazdy / 45 min przerwy, 9 h jazdy / 11 h odpoczynku. Uproszczenia opisane w `drivingRules.ts`.
 - **Ekonomia:** fracht, paliwo, myto, pensje, leasing, naprawy, mandaty, kary za spóźnienie. Struktura kosztów na dashboardzie.
@@ -106,5 +108,5 @@ Wszystkie liczby balansu są w `data/balance.ts`. Wartości rynkowe (diesel, e-T
 2. Licencje: międzynarodowa (otwiera Europę), ADR, chłodnie.
 3. Naczepy (plandeka, chłodnia, ADR) i dopasowanie do ładunków.
 4. Finanse: kredyt, faktury z terminem płatności (zatory płatnicze!), bankructwo.
-5. Europa: kraje, waluty, myto, ceny paliwa, kabotaż, zakazy weekendowe, języki kierowców.
+5. Europa: kraje, waluty, myto, ceny paliwa, kabotaż, zakazy weekendowe, języki kierowców. Razem z Europą **podwójna obsada**: drugi kierowca w zestawie (pauza 45 min w jadącym aucie, 9 h odpoczynku na postoju w ciągu 30 h, ok. 1,7× więcej km na dobę), ekspresy z wyższą stawką i dopasowanie charakterów w parze (morale).
 6. Osiągnięcia i więcej zdarzeń.

@@ -1,6 +1,7 @@
 import { BALANCE } from '../data/balance';
 import { CITY_BY_ID } from '../data/cities';
 import { kmAt, phaseAt } from './drivingRules';
+import { ROAD_EVENT_BY_ID, eventCtx, optionHint, optionLabel } from './roadEvents';
 import { RANKS, UPGRADES, YARD, type Upgrade } from '../data/progression';
 import { driverCap, driverOfTruck, fleetCap, isAvailable, previewJob, rankIndex, serviceQuote, truckOfDriver, upgradesPerDay, type JobPreview } from './sim';
 import type { BaseState, DayRecord, Driver, GameState, Job, LogEntry, Phase, PhaseKind, Truck, TruckOffer } from './types';
@@ -116,6 +117,24 @@ export interface Snapshot {
   drivers: DriverView[];
   candidates: Driver[];
   truckOffers: TruckOffer[];
+  settings: GameState['settings'];
+  /** Zdarzenia czekające na decyzję gracza (zegar stoi). */
+  decisions: DecisionView[];
+}
+
+export interface DecisionView {
+  id: string;
+  title: string;
+  text: string;
+  truckId: string;
+  fleetNo: number;
+  driver: Driver;
+  route: string;
+  /** Zapas czasu do terminu w chwili zdarzenia (min). */
+  bufferMin: number;
+  options: { id: string; label: string; hint: string }[];
+  /** Co wybrałby kierowca, gdyby decydował sam. */
+  driverPick: string;
 }
 
 /**
@@ -255,5 +274,28 @@ export function buildSnapshot(s: GameState): Snapshot {
     }),
     candidates: s.candidates,
     truckOffers: s.truckOffers,
+    settings: s.settings,
+    decisions: s.decisions.flatMap((dec): DecisionView[] => {
+      const def = ROAD_EVENT_BY_ID[dec.eventId];
+      const trip = s.trips[dec.tripId];
+      const d = s.drivers.find((x) => x.id === dec.driverId);
+      const t = s.trucks.find((x) => x.id === dec.truckId);
+      if (!def || !trip || !d || !t) return [];
+      const c = eventCtx(s, trip, d, t, dec.vars);
+      return [
+        {
+          id: dec.id,
+          title: def.title,
+          text: def.text(c),
+          truckId: t.id,
+          fleetNo: fleetNo.get(t.id) ?? 0,
+          driver: d,
+          route: `${CITY_BY_ID[trip.job.fromId].name} → ${CITY_BY_ID[trip.job.toId].name}`,
+          bufferMin: c.buffer,
+          options: def.options.map((o) => ({ id: o.id, label: optionLabel(o, c), hint: optionHint(o, c) })),
+          driverPick: def.auto(c),
+        },
+      ];
+    }),
   };
 }

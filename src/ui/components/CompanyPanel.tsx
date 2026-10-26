@@ -8,11 +8,13 @@ export function CompanyPanel({
   onYard,
   onUpgrade,
   onAutoDispatch,
+  onAskDecisions,
 }: {
   snap: Snapshot;
   onYard: () => void;
   onUpgrade: (id: UpgradeId) => void;
   onAutoDispatch: (on: boolean) => void;
+  onAskDecisions: (on: boolean) => void;
 }) {
   const c = snap.company;
   const span = c.repTo !== null ? c.repTo - c.repFrom : 1;
@@ -89,6 +91,20 @@ export function CompanyPanel({
               )}
             </article>
           ))}
+
+          <article className="up-card">
+            <div className="up-head">
+              <strong>Telefon od kierowców</strong>
+            </div>
+            <div className="muted up-desc">
+              Gdy na trasie coś się dzieje, kierowca dzwoni po decyzję, a zegar gry czeka. Wyłączone: kierowcy decydują sami, zgodnie ze swoim
+              charakterem. Gdy gra działa w tle, i tak decydują sami.
+            </div>
+            <label className="switch">
+              <input type="checkbox" checked={snap.settings.askDecisions} onChange={(e) => onAskDecisions(e.target.checked)} />
+              <span>{snap.settings.askDecisions ? 'Pytają mnie o decyzje' : 'Decydują sami'}</span>
+            </label>
+          </article>
         </div>
       </div>
     </section>

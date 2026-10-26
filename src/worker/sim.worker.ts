@@ -45,7 +45,8 @@ function tick() {
   if (!state) return;
   // W tle gra idzie w tempie bazowym, tak samo jak przy nieobecności.
   const effective = hidden ? BASE_PACE : pace;
-  if (effective > 0) advanceTo(state, state.now + Math.min(dtSec * effective, MAX_TICK_GAME_MIN));
+  // Gracz patrzy (karta widoczna): zdarzenia z decyzją zatrzymują zegar i czekają na wybór.
+  if (effective > 0) advanceTo(state, state.now + Math.min(dtSec * effective, MAX_TICK_GAME_MIN), !hidden);
   pushSnapshot();
   if (Date.now() - lastSave > AUTOSAVE_MS) void persist();
 }
@@ -98,6 +99,8 @@ const api: SimApi = {
   upgradeYard: () => act(() => E.upgradeYard(state!)),
   buyUpgrade: (id) => act(() => E.buyUpgrade(state!, id)),
   setAutoDispatch: (on) => act(() => E.setAutoDispatch(state!, on)),
+  resolveDecision: (id, option) => act(() => E.resolveDecision(state!, id, option)),
+  setAskDecisions: (on) => act(() => E.setAskDecisions(state!, on)),
   newGame(seed) {
     state = newGame(seed ?? ((Math.random() * 2 ** 31) | 0));
     void persist();

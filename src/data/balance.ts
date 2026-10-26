@@ -35,6 +35,8 @@ export const BALANCE = {
   hireFee: 2_500,
   lateMoraleHit: 5,
   /** Tolerancja klienta: spóźnienie do tylu minut przechodzi bez kary. */
+  /** Szansa na zdarzenie z decyzją gracza na kursie ok. 350 km (dłuższe kursy: więcej). */
+  roadEventChance: 0.25,
   lateGraceMin: 60,
   /** Poniżej takiego zapasu czasu giełda ostrzega „na styk”. */
   tightBufferMin: 120,

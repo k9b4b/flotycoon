@@ -2,7 +2,7 @@ import { BALANCE } from '../../data/balance';
 import { MARKETS, RANKS } from '../../data/progression';
 import type { Snapshot } from '../../engine/view';
 import { km, pct, pln } from '../format';
-import { ScoreBadge, StatBars, TraitChips, wearColor } from './driverUi';
+import { PerkList, ScoreBadge, StatBars, TraitChips, wearColor } from './driverUi';
 import { TruckPicker } from './Pairing';
 import type { FleetActions } from './FleetPanel';
 
@@ -64,7 +64,7 @@ export function CandidatesList({ snap, a }: { snap: Snapshot; a: FleetActions })
     <>
       <p className="staff-note muted">
         Nowi kandydaci co 2 dni. Im wyższa ranga firmy, tym lepsi ludzie się zgłaszają{next ? ` (następna: „${next.name}”)` : ''}. Lepsi kierowcy
-        chcą więcej zarabiać.
+        mają więcej cech specjalnych, częściej pozytywnych, i chcą więcej zarabiać.
         {full && <strong className="bad"> Limit kierowców osiągnięty: rozbuduj plac.</strong>}
       </p>
       {snap.candidates.length === 0 && <div className="empty">Nikt nie dzwoni. Może jutro.</div>}
@@ -80,8 +80,8 @@ export function CandidatesList({ snap, a }: { snap: Snapshot; a: FleetActions })
               {pln(c.salaryPerDay)}/dzień
             </span>
           </div>
-          <TraitChips d={c} max={4} />
           <StatBars d={c} skipMorale />
+          <PerkList d={c} />
           <p className="quirk">{c.quirk}</p>
           <div className="fc-actions">
             <button className="btn small primary" disabled={full || broke} onClick={() => a.hire(c.id)}>

@@ -5,7 +5,7 @@ import { acceptJob, advanceTo, catchUp, newGame, previewJob } from '../src/engin
 import { botTick } from '../tools/bot';
 import { roadKm } from '../src/engine/routes';
 import { BALANCE } from '../src/data/balance';
-import type { GameState } from '../src/engine/types';
+import { SAVE_VERSION, type GameState } from '../src/engine/types';
 
 describe('kolejka zdarzeń', () => {
   it('zwraca zdarzenia po czasie, remisy w kolejności dodania', () => {
@@ -95,7 +95,7 @@ describe('symulacja', () => {
     expect(r.ok).toBe(true);
     const trip = s.trips[truck.tripId!];
     const revenue0 = s.totals.revenue;
-    advanceTo(s, trip.eta + 1);
+    advanceTo(s, trip.eta + 12 * 60); // zapas na ewentualne zdarzenie na trasie
     expect(truck.tripId).toBeNull();
     expect(truck.cityId).toBe(job.toId);
     expect(s.totals.revenue).toBeGreaterThan(revenue0);
@@ -271,11 +271,118 @@ describe('progresja i rynek', () => {
     old.totals.lateJobs = 5;
     old.trucks = [old.trucks[0], { ...old.trucks[0], id: 'tX' }, { ...old.trucks[0], id: 'tY' }, { ...old.trucks[0], id: 'tZ' }];
     const m = migrate(old)!;
-    expect(m.version).toBe(2);
+    expect(m.version).toBe(SAVE_VERSION);
     expect(m.reputation).toBe(30);
     expect(m.base.yard).toBe(1); // 4 auta nie mieszczą się na placu na 3
     advanceTo(m, m.now + 1);
     expect(m.candidates.length).toBeGreaterThan(0);
     expect(m.truckOffers.length).toBeGreaterThan(0);
+  });
+});
+
+describe('perki i zdarzenia na trasie', () => {
+  it('lepsi kierowcy mają więcej perków i częściej pozytywne', async () => {
+    const { rollPerks } = await import('../src/engine/company');
+    const { createRng } = await import('../src/engine/rng');
+    const { PERK_BY_ID } = await import('../src/data/perks');
+    const r = createRng(7);
+    const stats = (q: number) => {
+      let n = 0;
+      let good = 0;
+      for (let i = 0; i < 2000; i++) {
+        const p = rollPerks(r, q);
+        n += p.length;
+        good += p.filter((id) => PERK_BY_ID[id].tone === 'good').length;
+        // bez sprzecznych par i duplikatów
+        expect(new Set(p).size).toBe(p.length);
+        for (const a of p) for (const b of p) expect(PERK_BY_ID[a].excludes?.includes(b) ?? false).toBe(false);
+      }
+      return { avg: n / 2000, goodShare: good / n };
+    };
+    const weak = stats(30);
+    const top = stats(90);
+    expect(top.avg).toBeGreaterThan(weak.avg);
+    expect(top.goodShare).toBeGreaterThan(0.6);
+    expect(weak.goodShare).toBeLessThan(0.35);
+  });
+
+  it('perki działają na symulację', async () => {
+    const { perkMods, driverSpeedKmh } = await import('../src/engine/effects');
+    const s = newGame(40);
+    const d = { ...s.drivers[0], perks: [] as any[] };
+    const v0 = driverSpeedKmh(d);
+    d.perks = ['pirat', 'cb_radio'];
+    expect(driverSpeedKmh(d)).toBeCloseTo(v0 * 1.05);
+    expect(perkMods(d).itdMul).toBeCloseTo(1.6);
+  });
+
+  it('opóźnienie wstawione w środku kursu przesuwa resztę harmonogramu i koniec kursu', async () => {
+    const E = await import('../src/engine/sim');
+    const s = newGame(41);
+    const t = s.trucks[0];
+    const job = s.market.find((j) => j.km > 200)!;
+    expect(acceptJob(s, job.id, t.id).ok).toBe(true);
+    const trip = s.trips[t.tripId!];
+    const eta0 = trip.eta;
+    const drive = trip.phases.find((p) => p.kind === 'drive')!;
+    const at = (drive.start + drive.end) / 2;
+    E.delayTrip(trip, at, 90, { kind: 'event', text: 'test', cost: 0, tone: 'info' });
+    expect(trip.eta).toBeCloseTo(eta0 + 90);
+    for (let i = 1; i < trip.phases.length; i++) expect(trip.phases[i].start).toBeCloseTo(trip.phases[i - 1].end);
+    expect(trip.phases.at(-1)!.km1).toBeCloseTo(trip.emptyKm + trip.job.km);
+    advanceTo(s, eta0 + 60);
+    expect(t.tripId).not.toBeNull(); // stary termin końca już nie obowiązuje
+    advanceTo(s, eta0 + 12 * 60);
+    expect(t.tripId).toBeNull();
+  });
+
+  it('w trakcie gry zdarzenie zatrzymuje zegar do decyzji; w tle decyduje kierowca', async () => {
+    const E = await import('../src/engine/sim');
+    const { qPush } = await import('../src/engine/queue');
+    const s = newGame(42);
+    const t = s.trucks[0];
+    const job = s.market.find((j) => j.km > 200)!;
+    acceptJob(s, job.id, t.id);
+    const trip = s.trips[t.tripId!];
+    const at = s.now + 60;
+    qPush(s.queue, at, { type: 'ROAD_EVENT', tripId: trip.id });
+    advanceTo(s, s.now + 600, true);
+    expect(s.decisions.length).toBeGreaterThan(0);
+    const frozen = s.now;
+    expect(frozen).toBeLessThanOrEqual(at + 1e-6);
+    advanceTo(s, s.now + 600, true);
+    expect(s.now).toBe(frozen); // czeka
+    const dec = s.decisions[0];
+    const opt = E.ROAD_EVENT_BY_ID[dec.eventId].options[0].id;
+    expect(E.resolveDecision(s, dec.id, opt).ok).toBe(true);
+    expect(s.decisions.filter((d) => d.id === dec.id).length).toBe(0);
+    // tryb nieinteraktywny: nikt nie czeka
+    const s2 = newGame(42);
+    const t2 = s2.trucks[0];
+    acceptJob(s2, job.id, t2.id);
+    qPush(s2.queue, s2.now + 60, { type: 'ROAD_EVENT', tripId: t2.tripId! });
+    advanceTo(s2, s2.now + 600);
+    expect(s2.decisions.length).toBe(0);
+    expect(s2.log.some((e) => e.text.includes('sam'))).toBe(true);
+  });
+
+  it('każda opcja każdego zdarzenia daje sensowny wynik', async () => {
+    const E = await import('../src/engine/sim');
+    const s = newGame(43);
+    const t = s.trucks[0];
+    acceptJob(s, s.market[0].id, t.id);
+    const trip = s.trips[t.tripId!];
+    const d = s.drivers[0];
+    for (const def of E.ROAD_EVENTS) {
+      for (const o of def.options) {
+        const c = E.eventCtx(s, trip, d, t, {});
+        c.vars = def.init?.(c) ?? {};
+        const out = o.resolve(c);
+        expect(out.text.length).toBeGreaterThan(5);
+        expect(out.text).not.toContain('{');
+        expect(def.text(c)).not.toContain('{');
+        expect(def.options.map((x) => x.id)).toContain(def.auto(c));
+      }
+    }
   });
 });

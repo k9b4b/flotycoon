@@ -3,6 +3,7 @@ import type { CatchUpReport } from '../engine/sim';
 import { SPEED_PRESETS, formatDuration, formatGameTime } from '../engine/time';
 import { CashChart, CostBreakdown } from './components/Charts';
 import { CompanyPanel } from './components/CompanyPanel';
+import { DecisionModal } from './components/DecisionModal';
 import { FleetPanel } from './components/FleetPanel';
 import { LogPanel } from './components/LogPanel';
 import { MapPanel } from './components/MapPanel';
@@ -34,10 +35,10 @@ export function App() {
     });
   }, []);
 
-  const notify = (text: string, bad = false) => {
+  const notify = (text: string, bad = false, ms = 4500) => {
     setToast({ text, bad });
     window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setToast(null), 4500);
+    timer.current = window.setTimeout(() => setToast(null), ms);
   };
 
   const run = async (p: Promise<{ ok: true; message: string } | { ok: false; error: string }>) => {
@@ -92,7 +93,7 @@ export function App() {
         <div className={`topbar-cash num ${snap.cash < 0 ? 'bad' : ''}`}>{pln(snap.cash)}</div>
         <div className="clock">
           <div className="time">{formatGameTime(snap.now, true)}</div>
-          <div className="label">czas gry</div>
+          <div className={`label${snap.decisions.length ? ' warn' : ''}`}>{snap.decisions.length ? 'czeka na decyzję' : 'czas gry'}</div>
         </div>
         <div className="speed" role="group" aria-label="Tempo gry">
           {SPEED_PRESETS.map((s) => (
@@ -209,6 +210,7 @@ export function App() {
           onYard={() => run(sim.upgradeYard())}
           onUpgrade={(id) => run(sim.buyUpgrade(id))}
           onAutoDispatch={(on) => run(sim.setAutoDispatch(on))}
+          onAskDecisions={(on) => run(sim.setAskDecisions(on))}
         />
         <CashChart snap={snap} />
         <CostBreakdown snap={snap} />
@@ -216,7 +218,18 @@ export function App() {
       </main>
 
       {mobile && <TabBar tab={tab} onTab={switchTab} badges={badges} />}
-      {toast && <div className={`toast${toast.bad ? ' bad' : ''}`}>{toast.text}</div>}
+      {snap.decisions[0] && (
+        <DecisionModal
+          d={snap.decisions[0]}
+          more={snap.decisions.length - 1}
+          onChoose={(opt) => {
+            const id = snap.decisions[0].id;
+            void sim.resolveDecision(id, opt).then((r) => notify(r.ok ? r.message : r.error, !r.ok, 9000));
+          }}
+          onShow={() => showTruckOnMap(snap.decisions[0].truckId)}
+        />
+      )}
+      {toast && !snap.decisions.length && <div className={`toast${toast.bad ? ' bad' : ''}`}>{toast.text}</div>}
     </div>
   );
 }

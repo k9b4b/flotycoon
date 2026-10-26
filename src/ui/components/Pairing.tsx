@@ -1,6 +1,7 @@
 import type { DriverView, Snapshot, TruckView } from '../../engine/view';
 import { pct } from '../format';
-import { driverScore, traits } from './driverUi';
+import { PERK_BY_ID } from '../../data/perks';
+import { driverScore } from './driverUi';
 import type { FleetActions } from './FleetPanel';
 
 /**
@@ -13,7 +14,7 @@ const s1 = (n: number) => n.toFixed(1).replace('.', ',');
 function driverOption(dv: DriverView, target: TruckView) {
   const d = dv.driver;
   const s = d.stats;
-  const top = traits(d, 1)[0]?.text;
+  const top = (d.perks ?? []).map((id) => PERK_BY_ID[id].name).join(', ');
   let where = 'wolny';
   if (dv.truckLabel) where = target.driver ? `zamiana z ${dv.truckLabel.split(' ')[0]}` : `z ${dv.truckLabel.split(' ')[0]}`;
   return `„${d.nickname}” · ocena ${driverScore(d)} (D${s.experience} E${s.eco} N${s.reliability} K${s.stamina})${top ? ` · ${top}` : ''} · ${where}`;

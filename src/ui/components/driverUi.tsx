@@ -1,3 +1,4 @@
+import { PERK_BY_ID } from '../../data/perks';
 import type { Driver } from '../../engine/types';
 import { STAT_LABELS } from '../format';
 
@@ -33,15 +34,38 @@ export function statColor(v: number) {
 
 export const wearColor = (w: number) => (w > 0.5 ? 'var(--bad)' : w > 0.3 ? 'var(--accent)' : 'var(--good)');
 
-export function TraitChips({ d, max }: { d: Driver; max?: number }) {
+/** Krótkie etykiety na karcie: perki kierowcy (i ostrzeżenie o morale). Opisy w szczegółach. */
+export function TraitChips({ d }: { d: Driver; max?: number }) {
+  const items = [
+    ...(d.stats.morale < 40 ? [{ text: 'Morale nisko', tone: 'bad', hint: 'Częściej wpada na kontrolach. Pomaga premia i terminowe kursy.' }] : []),
+    ...(d.perks ?? []).map((id) => ({ text: PERK_BY_ID[id].name, tone: PERK_BY_ID[id].tone, hint: PERK_BY_ID[id].desc })),
+  ];
   return (
     <div className="fc-traits">
-      {traits(d, max).map((x) => (
+      {items.map((x) => (
         <span key={x.text} className={`fc-trait ${x.tone}`} title={x.hint}>
           {x.text}
         </span>
       ))}
     </div>
+  );
+}
+
+/** Perki z pełnym opisem: do szczegółów kierowcy i rynku pracy. */
+export function PerkList({ d }: { d: Driver }) {
+  if (!d.perks?.length) return null;
+  return (
+    <ul className="perk-list">
+      {d.perks.map((id) => {
+        const p = PERK_BY_ID[id];
+        return (
+          <li key={id}>
+            <span className={`fc-trait ${p.tone}`}>{p.name}</span>
+            <span className="muted">{p.desc}</span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

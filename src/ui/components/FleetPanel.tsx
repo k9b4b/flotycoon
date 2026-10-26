@@ -6,7 +6,7 @@ import { dutyAfterIdle } from '../../engine/drivingRules';
 import { formatClock, formatDuration, formatGameTime } from '../../engine/time';
 import type { Snapshot, TruckView } from '../../engine/view';
 import { city, km, pct, pln } from '../format';
-import { ScoreBadge, StatBars, TraitChips, wearColor } from './driverUi';
+import { PerkList, ScoreBadge, StatBars, TraitChips, wearColor } from './driverUi';
 import { DriverPicker } from './Pairing';
 import { CandidatesList, DriversList, Showroom } from './Staffing';
 
@@ -142,6 +142,7 @@ function Details({ t, snap, a }: { t: TruckView; snap: Snapshot; a: FleetActions
       {d && (
         <>
           <StatBars d={d} />
+          <PerkList d={d} />
           <div className="fc-morale">
             <span className="muted">
               Morale mnoży niezawodność: im niższe, tym częściej kierowca wpada na kontroli ITD. Rośnie przy terminowych kursach, spada przy

@@ -64,7 +64,7 @@ Workflow `.github/workflows/routes.yml` liczy trasy dla każdej pary miast i zap
 
 Lokalnie (Java 17+, ok. 6 GB RAM dla Polski): pobierz `graphhopper-web-<wersja>.jar` i `poland-latest.osm.pbf` z Geofabrik do `data/`, uruchom `java -Xmx6g -jar data/graphhopper.jar server tools/routes/config.yml`, a potem `npm run routes`.
 
-Profil ciężarówki (`tools/routes/truck.json`) omija drogi z ograniczeniem masy poniżej 40 t i wysokości poniżej 4 m oraz limituje prędkość do 85 km/h. Silnik gry nadal liczy czas przejazdu po swojemu (statystyki kierowcy, przepisy); z GraphHoppera bierze tylko dystans i przebieg drogi.
+Profil ciężarówki (`tools/routes/flotruck.json`) omija drogi z ograniczeniem masy poniżej 40 t i wysokości poniżej 4 m oraz limituje prędkość do 85 km/h. Silnik gry nadal liczy czas przejazdu po swojemu (statystyki kierowcy, przepisy); z GraphHoppera bierze tylko dystans i przebieg drogi.
 
 ## Co już jest w symulacji
 

@@ -9,7 +9,7 @@ graphhopper:
   prepare.min_network_size: 200
   profiles:
     - name: truck
-      custom_model_files: [truck.json]
+      custom_model_files: [flotruck.json]
   # Bez profiles_ch: preprocessing CH trwa długo, a do ~100 zapytań wystarczy zwykłe wyszukiwanie.
   profiles_ch: []
   profiles_lm: []

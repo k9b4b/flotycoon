@@ -94,11 +94,24 @@ export function generateTruck(s: GameState, driverId: string, cityId: string): T
   };
 }
 
-function generateJob(s: GameState): Job {
+/**
+ * Skąd biorą się ładunki: giełda pokazuje głównie okolice naszych aut, tak jak
+ * prawdziwa giełda filtrowana po lokalizacji. Część ofert jest z miejsc, w których
+ * stoją wolne zestawy, część z miast, do których właśnie jadą (ładunek powrotny).
+ */
+function pickOrigin(s: GameState): string {
   const r = s.rng;
-  // Połowa zleceń startuje tam, gdzie stoją nasze wolne ciągniki — giełda „widzi” okolicę.
-  const idleCities = s.trucks.filter(isAvailable).map((t) => t.cityId);
-  const fromId = idleCities.length > 0 && chance(r, 0.5) ? pick(r, idleCities) : pickWeighted(r, CITIES, (c) => c.weight).id;
+  const idle = s.trucks.filter(isAvailable).map((t) => t.cityId);
+  const heading = Object.values(s.trips).map((t) => t.job.toId);
+  const x = rand(r);
+  if (idle.length > 0 && x < 0.35) return pick(r, idle);
+  if (heading.length > 0 && x < 0.6) return pick(r, heading);
+  return pickWeighted(r, CITIES, (c) => c.weight).id;
+}
+
+export function generateJob(s: GameState, forcedFrom?: string): Job {
+  const r = s.rng;
+  const fromId = forcedFrom ?? pickOrigin(s);
   let to = pickWeighted(r, CITIES, (c) => c.weight);
   let guard = 0;
   while ((to.id === fromId || roadKm(fromId, to.id) < BALANCE.minJobKm) && guard++ < 50) {
@@ -111,9 +124,19 @@ function generateJob(s: GameState): Job {
   // Krótkie trasy mają wyższą stawkę za km (realnie tak jest: załadunek kosztuje tyle samo).
   const shortBonus = km < 250 ? 1 + (250 - km) / 600 : 1;
   const payment = Math.round((km * ratePerKm * shortBonus) / 10) * 10;
-  const driveH = km / BALANCE.baseSpeedKmh;
-  const estMin = (driveH + Math.floor(driveH / 4.5) * 0.75 + Math.floor(driveH / 9) * 11) * 60 + BALANCE.loadMin + BALANCE.unloadMin;
-  const slack = urgent ? randRange(r, 1.1, 1.3) : randRange(r, 1.35, 2.2);
+  // Czas kursu dla typowego kierowcy w połowie dnia pracy: z przerwami i ewentualnym
+  // odpoczynkiem dobowym, tak jak liczy go realny spedytor.
+  const est = planTrip(
+    s.now,
+    [{ kind: 'load', min: BALANCE.loadMin }, { kind: 'drive', km }, { kind: 'unload', min: BALANCE.unloadMin }],
+    BALANCE.baseSpeedKmh,
+    [],
+    { sinceBreak: 0, today: 270, at: s.now },
+  );
+  const estMin = est.phases[est.phases.length - 1].end - s.now;
+  // Okno załadunku: tyle czasu jest, żeby dojechać i zacząć ładować. Potem oferta znika.
+  const loadWindow = urgent ? randInt(r, 2, 4) * 60 : randInt(r, 4, 10) * 60;
+  const slack = urgent ? randRange(r, 1.05, 1.2) : randRange(r, 1.15, 1.6);
   return {
     id: newId(s, 'j'),
     fromId,
@@ -123,10 +146,10 @@ function generateJob(s: GameState): Job {
     weightT: randInt(r, cargo.minT, cargo.maxT),
     km,
     payment,
-    deadline: Math.round(s.now + 180 + estMin * slack),
+    deadline: Math.round(s.now + loadWindow + estMin * slack + 60),
     penaltyPerHour: Math.round((payment * randRange(r, 0.03, 0.06)) / 10) * 10,
     postedAt: s.now,
-    expiresAt: s.now + randInt(r, BALANCE.jobLifetimeMin[0], BALANCE.jobLifetimeMin[1]),
+    expiresAt: s.now + loadWindow,
   };
 }
 
@@ -188,6 +211,8 @@ export interface JobPreview {
   bufferMin: number;
   /** Na czas, ale z małym zapasem: korek albo kontrola mogą przesądzić. */
   tight: boolean;
+  /** Ile minut kursu to obowiązkowy odpoczynek dobowy (tachograf). */
+  restMin: number;
   tooFar: boolean;
 }
 
@@ -216,6 +241,7 @@ export function previewJob(s: GameState, job: Job, truck: Truck): JobPreview {
     onTime: eta <= job.deadline,
     bufferMin: job.deadline - eta,
     tight: eta <= job.deadline && job.deadline - eta < BALANCE.tightBufferMin,
+    restMin: phases.filter((p) => p.kind === 'rest').reduce((a, p) => a + p.end - p.start, 0),
     tooFar: emptyKm > BALANCE.maxEmptyRunKm,
   };
 }
@@ -382,6 +408,8 @@ function onTripDone(s: GameState, tripId: string) {
     log(s, 'good', `${driver.nickname} ${driver.female ? 'dowiozła' : 'dowiózł'} do ${city}: ${job.cargo.toLowerCase()}. Fracht ${fmtPLN(job.payment)}, paliwo i myto ${fmtPLN(trip.fuelCost + trip.tollCost)}. Na czysto: ${fmtPLN(net)}.`);
   }
   delete s.trips[tripId];
+  // Spedytor od razu szuka ładunku powrotnego z miejsca rozładunku.
+  for (let i = 0; i < BALANCE.backloadOffers; i++) s.market.push(generateJob(s, job.toId));
 }
 
 function onDaily(s: GameState) {

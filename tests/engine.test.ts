@@ -170,3 +170,19 @@ describe('morale', () => {
     expect(giveBonus(s, d.id).ok).toBe(false);
   });
 });
+
+describe('giełda', () => {
+  it('po rozładunku są ładunki powrotne z tego miasta, wykonalne na czas', () => {
+    const s = newGame(21);
+    const truck = s.trucks[0];
+    const job = s.market.find((j) => previewJob(s, j, truck).onTime)!;
+    expect(acceptJob(s, job.id, truck.id).ok).toBe(true);
+    advanceTo(s, s.trips[truck.tripId!].eta + 1);
+    const local = s.market.filter((j) => j.fromId === job.toId && j.expiresAt > s.now);
+    expect(local.length).toBeGreaterThanOrEqual(BALANCE.backloadOffers);
+    // Wypoczęty kierowca zdąży z każdym z nich (dojazd 0 km, okno załadunku i zapas w terminie).
+    truck.cityId = job.toId;
+    s.drivers[0].duty = { sinceBreak: 0, today: 0, at: s.now - 24 * 60 };
+    expect(local.every((j) => previewJob(s, j, truck).onTime)).toBe(true);
+  });
+});

@@ -75,7 +75,9 @@ Profil ciężarówki (`tools/routes/flotruck.json`) omija drogi z ograniczeniem 
 - **Giełda:** zlecenia generowane proceduralnie, z terminami i wyceną dla wybranego zestawu (dojazd, ETA, zysk, czy zdąży).
 - **Humor:** parodie marek, klienci, ładunki, zdarzenia drogowe i biurowe w `data/flavor.ts`.
 
-Wszystkie liczby balansu są w `data/balance.ts`. Wartości rynkowe (diesel, e-TOLL, stawki) to robocze przybliżenia do kalibracji. Obecnie bot z `sim:year` wychodzi mniej więcej na zero, więc rozsądny gracz zarabia, a nieuważny bankrutuje.
+Wszystkie liczby balansu są w `data/balance.ts`. Wartości rynkowe (diesel, e-TOLL, stawki) to robocze przybliżenia do kalibracji. Obecnie prosty bot z `sim:year` ma marżę 1–2% i w rok rośnie do kilkunastu zestawów, więc rozsądny gracz zarabia więcej, a nieuważny bankrutuje.
+
+**Giełda:** oferty pojawiają się głównie tam, gdzie stoją albo dojeżdżają nasze auta, a po każdym rozładunku dochodzą 3 ładunki powrotne z tego miasta. Każda oferta ma okno załadunku (potem znika) i termin dostawy liczony z przerwami i ewentualnym odpoczynkiem dobowym.
 
 ## Świadome uproszczenia prototypu
 

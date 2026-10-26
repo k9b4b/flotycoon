@@ -162,6 +162,11 @@ function PreviewCard({
           <span className="muted">{truck.driver.nickname}</span>
           {p.emptyKm > 0 && <span className="muted">dojazd {km(p.emptyKm)}</span>}
           <span className="muted">ETA {formatGameTime(p.eta)}</span>
+                    {p.restMin > 0 && (
+                      <span className="muted" title="Kierowca wyczerpał dzienny limit jazdy i musi odpocząć (tachograf)">
+                        w tym odpoczynek {formatDuration(p.restMin)}
+                      </span>
+                    )}
           <span className={p.profit >= 0 ? 'good num' : 'bad num'}>{plnSigned(p.profit)}</span>
           {p.tooFar ? <span className="badge bad">za daleko</span> : !p.onTime ? (
                       <span className="badge bad">nie zdąży</span>

@@ -25,10 +25,11 @@ export const BALANCE = {
   // Rynek zleceń
   marketSize: 12,
   marketRefreshMin: 180,
-  rateMinPerKm: 3.9,
-  rateMaxPerKm: 5.4,
+  /** Ile ofert z miasta rozładunku pojawia się, gdy zestaw kończy kurs. */
+  backloadOffers: 3,
+  rateMinPerKm: 3.4,
+  rateMaxPerKm: 4.5,
   minJobKm: 90,
-  jobLifetimeMin: [6 * 60, 30 * 60] as [number, number],
 
   // Flota i ludzie
   hireFee: 2_500,

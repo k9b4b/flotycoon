@@ -1,6 +1,6 @@
 import { BALANCE } from '../data/balance';
 import { CITIES, CITY_BY_ID, HOME_BASE } from '../data/cities';
-import { ARRIVE_FLAVOR, CARGO, CB_DEPART, CLIENTS, COMPANY_START, DAILY_FLAVOR, LATE_EXCUSES } from '../data/flavor';
+import { ARRIVE_FLAVOR, CARGO, CB_DEPART, CLIENTS, COMPANY_START, DAILY_FLAVOR, LATE_EXCUSES, NICKNAMES } from '../data/flavor';
 import { MARKETS, OFFICE, REPUTATION } from '../data/progression';
 import {
   addReputation,
@@ -16,7 +16,7 @@ import {
   usedOffer,
 } from './company';
 import { driverName, earn, fmtPLN, g, log, newId, spend, type ActionResult } from './core';
-import { planTrip, type Leg } from './drivingRules';
+import { FRESH_DUTY, planTrip, type Leg } from './drivingRules';
 import { clamp, driverSpeedKmh, perkMods, rollIncidents, tripCosts } from './effects';
 import { createQueue, qPeek, qPop, qPush } from './queue';
 import { chance, createRng, pick, pickWeighted, rand, randInt, randRange } from './rng';
@@ -26,7 +26,7 @@ import { checkMilestones, onTrainingDone } from './training';
 import { ALL_ROAD_EVENTS, ROAD_EVENT_BY_ID, eventCtx, optionLabel, type Outcome } from './roadEvents';
 import { roadKm } from './routes';
 import { MIN_PER_HOUR, dayIndex, formatDuration, formatGameTime, nextMidnight } from './time';
-import { SAVE_VERSION, type Driver, type GameEvent, type GameState, type IncidentInfo, type Job, type PendingDecision, type Phase, type Trip, type Truck, type TutorialState } from './types';
+import { SAVE_VERSION, type Driver, type GameEvent, type GameState, type IncidentInfo, type Job, type PendingDecision, type Phase, type Trip, type Truck, type TruckOffer, type TutorialState } from './types';
 
 // Ponowny eksport, żeby UI, worker i narzędzia miały jedno miejsce importu.
 export { driverName, fmtPLN, g, log, type ActionResult };
@@ -56,6 +56,7 @@ function pickOrigin(s: GameState): string {
   const x = rand(r);
   if (idle.length > 0 && x < 0.35) return pick(r, idle);
   if (heading.length > 0 && x < 0.6) return pick(r, heading);
+  if (x < 0.7) return s.hqCityId ?? HOME_BASE; // klienci z okolicy siedziby znają firmę
   return pickWeighted(r, CITIES, (c) => c.weight).id;
 }
 
@@ -114,8 +115,70 @@ function refillMarket(s: GameState) {
 
 // ─── Nowa gra ────────────────────────────────────────────────────────────────
 
-export function newGame(seed: number): GameState {
-  const s: GameState = {
+/** Wybory z kreatora firmy. Oferty auta i kandydaci pochodzą z setupOptions(seed). */
+export interface GameSetup {
+  seed: number;
+  companyName: string;
+  hqCityId: string;
+  truck: TruckOffer;
+  driver: Driver;
+}
+
+export interface SetupOptions {
+  seed: number;
+  trucks: TruckOffer[];
+  drivers: Driver[];
+  names: string[];
+}
+
+const COMPANY_NAMES = [
+  'Trans-Pol-Ex Sp. z o.o.',
+  'Szerokości Sp. z o.o.',
+  'Kopytko Logistics',
+  'Turbo-Trans s.c.',
+  'Lemoniada Logistyka',
+  'Wahadełko Spedycja',
+  'Pan Kaziu i Synowie',
+  'Euro-Rogal Transport',
+  'Firanka & Solówka Sp. j.',
+  'Budzik Express',
+];
+
+/** Początkowy kierowca jest trochę podciągnięty, żeby start nie był karą. */
+function boostStarter(d: Driver) {
+  d.stats.reliability = Math.max(d.stats.reliability, 60);
+  d.stats.stamina = Math.max(d.stats.stamina, 55);
+}
+
+/** Propozycje do kreatora: trzy auta (od taniego po porządne) i trzech kandydatów (od świeżaka po rutyniarza). */
+export function setupOptions(seed: number): SetupOptions {
+  const s = blankState(seed ^ 0x5eed);
+  const trucks = Array.from({ length: 8 }, () => {
+    const o = usedOffer(s);
+    o.wear = Math.min(o.wear, 0.35);
+    return o;
+  }).sort((a, b) => a.leasePerDay - b.leasePerDay);
+  const score = (d: Driver) => d.stats.experience + d.stats.eco + d.stats.reliability + d.stats.stamina;
+  const drivers = Array.from({ length: 8 }, () => {
+    const d = generateDriver(s, 'c');
+    boostStarter(d);
+    return d;
+  }).sort((a, b) => score(a) - score(b));
+  const spread = <T,>(xs: T[]) => [xs[0], xs[Math.floor(xs.length / 2)], xs[xs.length - 1]];
+  const r = s.rng;
+  const names = [...COMPANY_NAMES].sort(() => rand(r) - 0.5).slice(0, 4);
+  // Trzech kandydatów z różnymi ksywkami, żeby się nie myliło.
+  const picked = spread(drivers);
+  const used = new Set<string>();
+  for (const d of picked) {
+    if (used.has(d.nickname)) d.nickname = pick(r, NICKNAMES.filter((n) => !used.has(n)));
+    used.add(d.nickname);
+  }
+  return { seed, trucks: spread(trucks), drivers: picked, names };
+}
+
+function blankState(seed: number): GameState {
+  return {
     version: SAVE_VERSION,
     seed,
     rng: createRng(seed),
@@ -142,18 +205,31 @@ export function newGame(seed: number): GameState {
     contracts: [],
     contractOffers: [],
   };
-  const d = generateDriver(s);
-  // Pierwszy kierowca jest trochę lepszy, żeby start nie był karą.
-  d.stats.reliability = Math.max(d.stats.reliability, 60);
-  d.stats.stamina = Math.max(d.stats.stamina, 55);
+}
+
+export function newGame(seed: number, setup?: GameSetup): GameState {
+  const s = blankState(seed);
+  const hq = setup && CITY_BY_ID[setup.hqCityId] ? setup.hqCityId : HOME_BASE;
+  s.hqCityId = hq;
+  const name = setup?.companyName.trim().slice(0, 40);
+  if (name) s.companyName = name;
+  let d: Driver;
+  if (setup) {
+    d = { ...setup.driver, id: newId(s, 'd'), hiredAt: s.now, duty: FRESH_DUTY(s.now - 24 * 60) };
+  } else {
+    d = generateDriver(s);
+    boostStarter(d);
+  }
   s.drivers.push(d);
-  const first = truckFromOffer({ ...usedOffer(s), id: newId(s, 't') }, HOME_BASE, d.id);
-  first.wear = Math.min(first.wear, 0.3);
+  const offer = setup ? setup.truck : usedOffer(s);
+  const first = truckFromOffer({ ...offer, id: newId(s, 't') }, hq, d.id);
+  if (!setup) first.wear = Math.min(first.wear, 0.3);
   s.trucks.push(first);
   refillMarket(s);
   refreshCandidates(s);
   refreshTruckOffers(s);
   for (const line of COMPANY_START) log(s, 'funny', line.replace('{company}', s.companyName).replace('{cash}', fmtPLN(s.cash)));
+  log(s, 'info', `Siedziba: ${CITY_BY_ID[hq].name}. Pierwszy ciągnik: ${first.brand} ${first.model} (${first.plate}).`);
   log(s, 'info', `Zatrudniono: ${driverName(d)}. ${d.quirk}`);
   qPush(s.queue, nextMidnight(s.now), { type: 'DAILY' });
   qPush(s.queue, s.now + BALANCE.marketRefreshMin, { type: 'MARKET_REFRESH' });

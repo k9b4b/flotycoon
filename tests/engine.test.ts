@@ -504,3 +504,26 @@ describe('kontrakty i rozwój kierowców', () => {
     expect(m.costsByCategory.training).toBe(0);
   });
 });
+
+describe('kreator firmy', () => {
+  it('nowa gra z wyborami gracza: nazwa, siedziba, wybrane auto i kierowca', async () => {
+    const E = await import('../src/engine/sim');
+    const o = E.setupOptions(77);
+    expect(o.trucks.length).toBe(3);
+    expect(o.drivers.length).toBe(3);
+    expect(new Set(o.drivers.map((d) => d.nickname)).size).toBe(3);
+    expect(o.trucks[0].leasePerDay).toBeLessThanOrEqual(o.trucks[2].leasePerDay);
+    // ten sam seed daje te same propozycje
+    expect(JSON.stringify(E.setupOptions(77))).toBe(JSON.stringify(o));
+    const s = E.newGame(77, { seed: 77, companyName: '  Remik Trans  ', hqCityId: 'POZ', truck: o.trucks[2], driver: o.drivers[0] });
+    expect(s.companyName).toBe('Remik Trans');
+    expect(s.hqCityId).toBe('POZ');
+    expect(s.trucks[0].cityId).toBe('POZ');
+    expect(s.trucks[0].plate).toBe(o.trucks[2].plate);
+    expect(s.drivers[0].nickname).toBe(o.drivers[0].nickname);
+    expect(s.trucks[0].driverId).toBe(s.drivers[0].id);
+    s.cash = 1e6;
+    expect(E.leaseOffer(s, s.truckOffers[0].id).ok).toBe(true);
+    expect(s.trucks[1].cityId).toBe('POZ'); // auta z salonu odbiera się w siedzibie
+  });
+});

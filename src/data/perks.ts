@@ -63,7 +63,7 @@ export type PerkId =
 
 export const PERKS: readonly Perk[] = [
   // ─── Pozytywne ───
-  { id: 'zlota_raczka', name: 'Złota rączka', tone: 'good', desc: 'Naprawi wszystko taśmą i drutem. Awarie o połowę rzadziej, a z kontrolką silnika radzi sobie sam.', mods: { breakdownMul: 0.5 }, excludes: ['pechowiec'] },
+  { id: 'zlota_raczka', name: 'Złota rączka', tone: 'good', desc: 'Naprawi wszystko taśmą i drutem. Awarie o połowę rzadziej, a z kontrolką silnika radzi sobie bez mechanika.', mods: { breakdownMul: 0.5 }, excludes: ['pechowiec'] },
   { id: 'zna_skroty', name: 'Zna skróty', tone: 'good', desc: 'Korek? Jaki korek. Korki łapie o połowę rzadziej, a objazd wybiera bez błądzenia.', mods: { trafficMul: 0.5 }, excludes: ['pechowiec'] },
   { id: 'teczka', name: 'Teczka z papierami', tone: 'good', desc: 'Dokumenty w komplecie, ułożone kolorami. Mandat z ITD o połowę rzadziej.', mods: { itdMul: 0.5 }, excludes: ['zapominalski', 'pirat'] },
   { id: 'czuje_maszyne', name: 'Czuje maszynę', tone: 'good', desc: 'Jeździ, jakby auto było własne. Zużycie o 30% wolniej.', mods: { wearMul: 0.7 }, excludes: ['ciezka_noga'] },

@@ -5,6 +5,7 @@ import { CashChart, CostBreakdown } from './components/Charts';
 import { CompanyPanel } from './components/CompanyPanel';
 import { DecisionModal } from './components/DecisionModal';
 import { Coach, HelpSheet } from './components/Tutorial';
+import { SetupWizard } from './components/SetupWizard';
 import { FleetPanel } from './components/FleetPanel';
 import { LogPanel } from './components/LogPanel';
 import { MapPanel } from './components/MapPanel';
@@ -29,11 +30,13 @@ export function App() {
   const [focus, setFocus] = useState<MapFocus | null>(null);
   const [logSeenAt, setLogSeenAt] = useState(0);
   const [help, setHelp] = useState(false);
+  const [needsSetup, setNeedsSetup] = useState(false);
 
   useEffect(() => {
     sim.init().then((r) => {
       setReport(r.report);
       setSaving(r.saving);
+      setNeedsSetup(r.needsSetup);
     });
   }, []);
 
@@ -54,6 +57,7 @@ export function App() {
     if (mobile && tab === 'log') setLogSeenAt(latestLog);
   }, [mobile, tab, latestLog]);
 
+  if (needsSetup) return <SetupWizard onDone={() => setNeedsSetup(false)} />;
   if (!snap) return <div className="loading">Rozgrzewanie silnika…</div>;
 
   const showTruckOnMap = (id: string) => {
@@ -226,7 +230,16 @@ export function App() {
 
       {mobile && <TabBar tab={tab} onTab={switchTab} badges={badges} />}
       <Coach snap={snap} pace={pace} mobile={mobile} onTab={switchTab} />
-      {help && <HelpSheet onClose={() => setHelp(false)} />}
+      {help && (
+        <HelpSheet
+          onClose={() => setHelp(false)}
+          onNewGame={() => {
+            void sim.abandonGame();
+            setHelp(false);
+            setNeedsSetup(true);
+          }}
+        />
+      )}
       {snap.decisions[0] && (
         <DecisionModal
           d={snap.decisions[0]}

@@ -1,4 +1,4 @@
-import type { CatchUpReport, ActionResult } from '../engine/sim';
+import type { CatchUpReport, ActionResult, GameSetup, SetupOptions } from '../engine/sim';
 import type { Snapshot } from '../engine/view';
 import type { TutorialState } from '../engine/types';
 import type { UpgradeId } from '../data/progression';
@@ -6,7 +6,12 @@ import type { CourseId } from '../data/development';
 
 /** Kontrakt między UI a workerem symulacji. Typowany, bez bibliotek. */
 export interface SimApi {
-  init(): Promise<{ report: CatchUpReport | null; saving: boolean }>;
+  /** needsSetup: brak zapisu, gracz najpierw przechodzi kreator firmy. */
+  init(): Promise<{ report: CatchUpReport | null; saving: boolean; needsSetup: boolean }>;
+  setupOptions(seed?: number): SetupOptions;
+  startGame(setup: GameSetup): Promise<void>;
+  /** Porzuca obecną firmę (zapis zostaje, dopóki nowa nie wystartuje). */
+  abandonGame(): void;
   setPace(pace: number): void;
   setHidden(hidden: boolean): void;
   acceptJob(jobId: string, truckId: string): ActionResult;

@@ -70,14 +70,25 @@ const api: SimApi = {
       } else {
         report = null;
       }
-    } else {
-      state = newGame((Math.random() * 2 ** 31) | 0);
     }
     lastTick = performance.now();
     setInterval(tick, TICK_MS);
+    // Bez zapisu gra czeka na kreator firmy (startGame).
+    if (!state) return { report: null, saving, needsSetup: true };
     await persist();
     pushSnapshot();
-    return { report, saving };
+    return { report, saving, needsSetup: false };
+  },
+  setupOptions: (seed) => E.setupOptions(seed ?? ((Math.random() * 2 ** 31) | 0)),
+  abandonGame() {
+    state = null;
+  },
+  async startGame(setup) {
+    state = newGame(setup.seed, setup);
+    pace = BASE_PACE;
+    lastTick = performance.now();
+    await persist();
+    pushSnapshot();
   },
   setPace(p) {
     pace = p;

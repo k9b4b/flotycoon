@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Driver, TutorialState } from '../../engine/types';
 import type { Snapshot } from '../../engine/view';
 import { portraitSvg } from '../portrait';
@@ -361,7 +361,8 @@ export function Coach({ snap, pace, mobile, onTab }: { snap: Snapshot; pace: num
 }
 
 /** Ściągawka pod „?”: krótko o wszystkim, plus ponowne uruchomienie samouczka. */
-export function HelpSheet({ onClose }: { onClose: () => void }) {
+export function HelpSheet({ onClose, onNewGame }: { onClose: () => void; onNewGame: () => void }) {
+  const [confirm, setConfirm] = useState(false);
   const sections: [string, ReactNode][] = [
     ['Jak zarabiać', 'Bierz zlecenia z giełdy, dowoź na czas, od razu szukaj ładunku powrotnego. Stojące auto kosztuje ratę i pensję. Zysk przy zleceniu jest już po paliwie i mycie.'],
     ['Zapas i terminy', '⏱ to czas do terminu, 🚚 czas kursu Twoim autem z dojazdem, przerwami i odpoczynkiem. Zielony zapas = bezpiecznie, „na styk” = korek wystarczy do spóźnienia. Do godziny po terminie klient zwykle wybacza.'],
@@ -397,6 +398,21 @@ export function HelpSheet({ onClose }: { onClose: () => void }) {
         >
           Przejdź samouczek od nowa
         </button>
+        {confirm ? (
+          <div className="help-confirm">
+            <span>Na pewno? Obecna firma przepadnie.</span>
+            <button className="btn small danger" onClick={onNewGame}>
+              Tak, zakładam nową
+            </button>
+            <button className="btn small" onClick={() => setConfirm(false)}>
+              Nie
+            </button>
+          </div>
+        ) : (
+          <button className="btn small ghost" onClick={() => setConfirm(true)}>
+            Zacznij od nowa z inną firmą
+          </button>
+        )}
       </div>
     </div>
   );

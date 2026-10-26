@@ -236,7 +236,7 @@ export function leaseOffer(s: GameState, offerId: string): ActionResult {
   spend(s, o.deposit, 'fleet');
   s.truckOffers = s.truckOffers.filter((x) => x.id !== offerId);
   // Bez automatycznego przydziału: kluczyki wręcza gracz.
-  const t = truckFromOffer({ ...o, id: newId(s, 't') }, HOME_BASE, null);
+  const t = truckFromOffer({ ...o, id: newId(s, 't') }, s.hqCityId ?? HOME_BASE, null);
   s.trucks.push(t);
   const msg = `${o.condition === 'new' ? 'Nowiutki' : 'Używany'} ${t.brand} ${t.model} (${t.plate}) na placu. Czeka na kierowcę.`;
   log(s, 'good', msg);

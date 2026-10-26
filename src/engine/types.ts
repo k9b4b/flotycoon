@@ -208,6 +208,8 @@ export interface GameState {
   now: number;
   cash: number;
   companyName: string;
+  /** Siedziba firmy: tu odbiera się auta z salonu i stąd częściej startują zlecenia. */
+  hqCityId?: string;
   trucks: Truck[];
   drivers: Driver[];
   market: Job[];

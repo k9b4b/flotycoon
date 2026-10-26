@@ -1,6 +1,6 @@
 import { BALANCE } from '../data/balance';
 import { CITIES, CITY_BY_ID, HOME_BASE } from '../data/cities';
-import { CARGO, CLIENTS, COMPANY_START, DAILY_FLAVOR } from '../data/flavor';
+import { ARRIVE_FLAVOR, CARGO, CB_DEPART, CLIENTS, COMPANY_START, DAILY_FLAVOR, LATE_EXCUSES } from '../data/flavor';
 import { MARKETS, OFFICE, REPUTATION } from '../data/progression';
 import {
   addReputation,
@@ -19,7 +19,7 @@ import { planTrip, type Leg } from './drivingRules';
 import { clamp, driverSpeedKmh, perkMods, rollIncidents, tripCosts } from './effects';
 import { createQueue, qPeek, qPop, qPush } from './queue';
 import { chance, createRng, pick, pickWeighted, rand, randInt, randRange } from './rng';
-import { ROAD_EVENTS, ROAD_EVENT_BY_ID, eventCtx, optionLabel, type Outcome } from './roadEvents';
+import { ALL_ROAD_EVENTS, ROAD_EVENT_BY_ID, eventCtx, optionLabel, type Outcome } from './roadEvents';
 import { roadKm } from './routes';
 import { MIN_PER_HOUR, dayIndex, formatDuration, formatGameTime, nextMidnight } from './time';
 import { SAVE_VERSION, type Driver, type GameEvent, type GameState, type IncidentInfo, type Job, type PendingDecision, type Phase, type Trip, type Truck } from './types';
@@ -27,7 +27,7 @@ import { SAVE_VERSION, type Driver, type GameEvent, type GameState, type Inciden
 // Ponowny eksport, żeby UI, worker i narzędzia miały jedno miejsce importu.
 export { driverName, fmtPLN, g, log, type ActionResult };
 export * from './company';
-export { ROAD_EVENTS, ROAD_EVENT_BY_ID, eventCtx } from './roadEvents';
+export { ALL_ROAD_EVENTS as ROAD_EVENTS, ROAD_EVENT_BY_ID, eventCtx } from './roadEvents';
 
 // ─── Dostępność ──────────────────────────────────────────────────────────────
 
@@ -244,6 +244,7 @@ export function acceptJob(s: GameState, jobId: string, truckId: string): ActionR
   const via = emptyKm > 0 ? ` (najpierw ${emptyKm} km na pusto z ${CITY_BY_ID[truck.cityId].gen})` : '';
   const msg = `${driver.nickname} rusza: ${from} → ${to}${via}. ${job.cargo}.`;
   log(s, 'info', msg);
+  if (chance(s.rng, 0.25)) log(s, 'funny', fillDriver(pick(s.rng, CB_DEPART), driver));
   return { ok: true, message: msg };
 }
 
@@ -293,7 +294,7 @@ function onRoadEvent(s: GameState, tripId: string, interactive: boolean) {
   const d = s.drivers.find((x) => x.id === trip.driverId);
   const t = s.trucks.find((x) => x.id === trip.truckId);
   if (!d || !t) return;
-  const def = pickWeighted(s.rng, ROAD_EVENTS, (e) => e.weight);
+  const def = pickWeighted(s.rng, ALL_ROAD_EVENTS, (e) => e.weight);
   const vars = def.init?.(eventCtx(s, trip, d, t, {})) ?? {};
   const dec: PendingDecision = { id: newId(s, 'e'), eventId: def.id, tripId, driverId: d.id, truckId: t.id, at: s.now, vars };
   if (interactive && s.settings.askDecisions) s.decisions.push(dec);
@@ -335,7 +336,7 @@ function applyDecision(s: GameState, dec: PendingDecision, optionId: string | nu
   if (o.rep) addReputation(s, o.rep);
   const who = byDriver ? ` ${d.nickname} zdecydował${g(d)} sam${g(d)}: „${optionLabel(opt, c)}”.` : '';
   const fx = effectSummary(o);
-  const msg = `${def.title}.${who} ${o.text}${fx ? ` (${fx})` : ''}`;
+  const msg = `${def.title}${/[?!]$/.test(def.title) ? '' : '.'}${who} ${o.text}${fx ? ` (${fx})` : ''}`;
   log(s, o.tone, msg);
   return { ok: true, message: msg };
 }
@@ -357,6 +358,8 @@ export function setAskDecisions(s: GameState, on: boolean): ActionResult {
   if (!on) autoResolveAll(s);
   return { ok: true, message: on ? 'Kierowcy będą dzwonić z każdą decyzją na trasie.' : 'Kierowcy decydują sami. Szef ma święty spokój (prawie).' };
 }
+
+const fillDriver = (text: string, d: Driver) => text.replaceAll('{nick}', d.nickname).replaceAll('{a}', g(d));
 
 export function serviceQuote(s: GameState, t: Truck) {
   const mod = serviceModifiers(s);
@@ -504,13 +507,13 @@ function onTripDone(s: GameState, tripId: string): boolean {
   if (lateMin > 0) {
     if (driver) driver.lateJobs += 1;
     s.totals.lateJobs += 1;
-    log(s, 'bad', `${nick} spóźnił${driver ? g(driver) : ''} się ${formatDuration(lateMin)} do ${city}. Kara ${fmtPLN(penalty)}. „Korki były”. Na czysto: ${fmtPLN(net)}.`);
+    log(s, 'bad', `${nick} spóźnił${driver ? g(driver) : ''} się ${formatDuration(lateMin)} do ${city}. Kara ${fmtPLN(penalty)}. ${pick(s.rng, LATE_EXCUSES)} Na czysto: ${fmtPLN(net)}.`);
     addReputation(s, REPUTATION.late + (driver ? perkMods(driver).repLate : 0));
   } else {
     if (overMin > 0) {
       log(s, 'funny', `${nick} ${driver?.female ? 'dojechała' : 'dojechał'} do ${city} ${formatDuration(overMin)} po terminie. Magazynier westchnął, ale podpisał bez kary. Na czysto: ${fmtPLN(net)}.`);
     } else {
-      log(s, 'good', `${nick} ${driver?.female ? 'dowiozła' : 'dowiózł'} do ${city}: ${job.cargo.toLowerCase()}. Fracht ${fmtPLN(job.payment)}, paliwo i myto ${fmtPLN(trip.fuelCost + trip.tollCost)}. Na czysto: ${fmtPLN(net)}.`);
+      log(s, 'good', `${nick} ${driver?.female ? 'dowiozła' : 'dowiózł'} do ${city}: ${job.cargo.charAt(0).toLowerCase() + job.cargo.slice(1)}. Fracht ${fmtPLN(job.payment)}, paliwo i myto ${fmtPLN(trip.fuelCost + trip.tollCost)}. Na czysto: ${fmtPLN(net)}.${driver && chance(s.rng, 0.2) ? ` ${fillDriver(pick(s.rng, ARRIVE_FLAVOR), driver)}` : ''}`);
     }
     const urgent = job.cargo.includes('PILNE') ? REPUTATION.urgentBonus : 0;
     const long = job.km > 400 ? REPUTATION.longHaulBonus : 0;

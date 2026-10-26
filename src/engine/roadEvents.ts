@@ -269,7 +269,7 @@ export const ROAD_EVENTS: readonly RoadEventDef[] = [
     id: 'rattle',
     title: 'Coś grzechocze w naczepie',
     weight: 1,
-    text: (c) => c.fill(`Na wybojach coś zagrzechotało z tyłu. W naczepie: ${c.trip.job.cargo.toLowerCase()}.`),
+    text: (c) => c.fill(`Na wybojach coś zagrzechotało z tyłu. W naczepie: ${c.trip.job.cargo.charAt(0).toLowerCase() + c.trip.job.cargo.slice(1)}.`),
     options: [
       {
         id: 'check',
@@ -343,7 +343,110 @@ export const ROAD_EVENTS: readonly RoadEventDef[] = [
   },
 ];
 
-export const ROAD_EVENT_BY_ID: Record<string, RoadEventDef> = Object.fromEntries(ROAD_EVENTS.map((e) => [e.id, e]));
+
+// ─── Zdarzenia z życia trasy (awizacje, palety, autostopowicze) ─────────────
+
+const MORE_EVENTS: readonly RoadEventDef[] = [
+  {
+    id: 'ramp_slot',
+    title: 'Awizacja na 6:00, rozładunek o 14:00',
+    weight: 3,
+    init: (c) => ({ city: CITY_BY_ID[c.trip.job.toId].name }),
+    text: (c) =>
+      c.fill(`{nick} dzwoni: „Szefie, napisali z magazynu w ${c.vars.city}, że rampy zajęte i mam stanąć w kolejce. Awizacja niby jest, ale magazynier mówi, że »awizacja to tylko propozycja«”.`),
+    options: [
+      {
+        id: 'queue',
+        label: 'Stań w kolejce, nic nie poradzimy',
+        hint: '2–4 h czekania. Pewne.',
+        resolve: (c) => ({ text: c.fill('{nick} odstał{a} swoje pod rampą. Kawa z termosu się skończyła, cierpliwość też.'), tone: 'info', delayMin: ri(c, 120, 240), morale: -3 }),
+      },
+      {
+        id: 'argue',
+        label: 'Niech wywalczy wcześniejszą rampę',
+        hint: (c) => `Może skończyć się w godzinę, może kłótnią i jeszcze dłuższym czekaniem. Szansa ${c.has('ulubieniec') ? 'duża' : c.has('narwany') ? 'mała' : 'średnia'}.`,
+        resolve: (c) => {
+          if (chance(c.r, luck(c, 0.45 + (c.has('ulubieniec') ? 0.3 : 0)))) {
+            return { text: c.fill('{nick} pogadał{a} z magazynierem o wędkowaniu. Rampa numer 3 nagle się zwolniła.'), tone: 'good', delayMin: ri(c, 40, 70), morale: 3 };
+          }
+          return { text: 'Magazynier się obraził i „zgubił” awizację. Kolejka od nowa.', tone: 'bad', delayMin: ri(c, 200, 320), morale: -6, rep: -1 };
+        },
+      },
+      {
+        id: 'office',
+        label: (c) => (c.s.base.office ? 'Biuro dzwoni do klienta' : 'Sam dzwonisz do klienta'),
+        hint: (c) => (c.s.base.office ? 'Biuro spedycji ma kontakty: ok. 1 h.' : 'Ok. 1,5–2,5 h. Klient nie zawsze odbiera.'),
+        resolve: (c) => {
+          if (c.s.base.office || chance(c.r, 0.5)) return { text: 'Telefon do klienta, klient do magazynu, magazyn do rampy. Działa.', tone: 'good', delayMin: c.s.base.office ? ri(c, 50, 70) : ri(c, 90, 150) };
+          return { text: 'Klient: „Pani Bożena jest na urlopie, proszę dzwonić w poniedziałek”. Kolejka.', tone: 'bad', delayMin: ri(c, 150, 240) };
+        },
+      },
+    ],
+    auto: (c) => (c.has('ulubieniec') ? 'argue' : c.s.base.office ? 'office' : c.has('stoik') || c.buffer > 300 ? 'queue' : c.has('narwany') ? 'argue' : 'office'),
+  },
+  {
+    id: 'pallets',
+    title: 'Wymiana palet',
+    weight: 2,
+    init: (c) => ({ n: ri(c, 20, 33), cost: ri(c, 6, 14) * 100 }),
+    text: (c) => c.fill(`Na załadunku miało być ${c.vars.n} palet EPAL na wymianę. Magazyn rozkłada ręce: „Palet nie ma, będą w czwartek”. {nick} pyta, co robić.`),
+    options: [
+      {
+        id: 'cmr',
+        label: 'Wpisz do CMR i jedziemy',
+        hint: (c) => `Bez straty czasu. Może się uda odzyskać, a może zapłacimy za palety (ok. ${fmtPLN(n(c, 'cost'))}).`,
+        resolve: (c) => {
+          if (chance(c.r, 0.5 + (c.d.stats.reliability / 100) * 0.3)) return { text: 'Adnotacja w CMR zrobiła swoje. Klient oddał palety przy następnym kursie.', tone: 'good' };
+          return { text: 'Adnotacja była, ale nieczytelna. Klient twierdzi, że palety „wróciły”. Płacimy.', tone: 'bad', cost: n(c, 'cost'), costCat: 'fleet' };
+        },
+      },
+      {
+        id: 'wait',
+        label: 'Bez palet nie ruszamy',
+        hint: '1–2,5 h przepychanki. Często pomaga, czasem psuje relacje.',
+        resolve: (c) => {
+          if (chance(c.r, luck(c, 0.6))) return { text: 'Po godzinie palety „znalazły się” za halą. Wszyscy udają zdziwienie.', tone: 'good', delayMin: ri(c, 60, 120) };
+          return { text: 'Palet nie było. Klient zapamiętał nas jako „tych upartych”.', tone: 'bad', delayMin: ri(c, 90, 150), rep: -1, cost: n(c, 'cost'), costCat: 'fleet' };
+        },
+      },
+      {
+        id: 'pay',
+        label: (c) => `Odpuść i dopłać za palety (${fmtPLN(n(c, 'cost'))})`,
+        hint: 'Szybko i bez nerwów. Spedytor płacze w środku.',
+        resolve: (c) => ({ text: 'Palety spisane na straty. W biurze minuta ciszy.', tone: 'info', cost: n(c, 'cost'), costCat: 'fleet' }),
+      },
+    ],
+    auto: (c) => (c.has('narwany') ? 'wait' : c.d.stats.reliability > 60 || c.has('teczka') ? 'cmr' : c.buffer > 200 ? 'wait' : 'cmr'),
+  },
+  {
+    id: 'hitchhiker',
+    title: 'Muchomor na wylocie',
+    weight: 1,
+    init: (c) => ({ city: CITY_BY_ID[c.trip.job.toId].gen }),
+    text: (c) => c.fill(`Na wylocie z MOP-u stoi muchomor (autostopowicz) z tekturą „DO ${String(c.vars.city).toUpperCase()}”. {nick} pyta przez telefon, czy można zabrać.`),
+    options: [
+      {
+        id: 'take',
+        label: 'Zabierz, raźniej we dwóch',
+        hint: 'Morale w górę. Firmowe ubezpieczenie wolałoby nie wiedzieć.',
+        resolve: (c) => {
+          if (chance(c.r, 0.2)) return { text: c.fill('Autostopowicz zjadł kanapki, wypił kawę i całą drogę opowiadał o kryptowalutach. {nick} żałuje.'), tone: 'funny', morale: -3 };
+          return { text: c.fill('Autostopowicz okazał się byłym kierowcą. Dwie godziny opowieści, {nick} w świetnym humorze.'), tone: 'good', morale: 8 };
+        },
+      },
+      {
+        id: 'no',
+        label: 'Regulamin to regulamin',
+        hint: 'Nic się nie dzieje.',
+        resolve: (c) => ({ text: c.fill('{nick} macha ręką na przeprosiny i jedzie dalej.'), tone: 'info' }),
+      },
+    ],
+    auto: (c) => (c.d.stats.morale < 55 || c.has('optymista') ? 'take' : 'no'),
+  },
+];
+
+export const ALL_ROAD_EVENTS: readonly RoadEventDef[] = [...ROAD_EVENTS, ...MORE_EVENTS];
+export const ROAD_EVENT_BY_ID: Record<string, RoadEventDef> = Object.fromEntries(ALL_ROAD_EVENTS.map((e) => [e.id, e]));
 
 export const optionLabel = (o: RoadEventOption, c: EventCtx) => (typeof o.label === 'function' ? o.label(c) : o.label);
 export const optionHint = (o: RoadEventOption, c: EventCtx) => (typeof o.hint === 'function' ? o.hint(c) : o.hint);

@@ -77,7 +77,7 @@ Ranga odblokowuje rozbudowę bazy, a im wyższa, tym lepsi kandydaci na kierowc�
 - **Biuro spedycji**: więcej ofert i ładunków powrotnych.
 - **Dyspozytorka Halina**: sama przydziela bezpieczne ładunki wolnym zestawom i wysyła zużyte auta do serwisu (można ją wstrzymać).
 
-**Kierowcy i auta są osobno.** Rynek pracy pokazuje kandydatów (zmiana co 2 dni) z oczekiwaną pensją rosnącą ze statystykami. Salon oferuje auta w leasingu (zmiana co 3 dni): używane z kaucją 6 000 zł, a od rangi „Lokalny przewoźnik” także nowe, oszczędniejsze i bez zużycia, ale z dwa razy wyższą ratą. Kierowcę można przesadzić do innego auta, zwolnić (odprawa 5 dniówek), a auto zwrócić (kara 5 rat, kaucja przepada).
+**Kierowcy i auta są osobno.** Rynek pracy pokazuje kandydatów (zmiana co 2 dni) z oczekiwaną pensją rosnącą ze statystykami. Salon oferuje auta w leasingu (zmiana co 3 dni): używane z kaucją 6 000 zł, a od rangi „Lokalny przewoźnik” także nowe, oszczędniejsze i bez zużycia, ale z dwa razy wyższą ratą. Gra nie łączy par sama: kto czym jeździ, decyduje gracz. Przesadzenie kierowcy do zajętego auta zamienia kierowców miejscami (gdy żaden nie jest w trasie), a listy wyboru pokazują ocenę kierowcy (średnia umiejętności) i parametry aut. Kierowcę można zwolnić (odprawa 5 dniówek), a auto zwrócić (kara 5 rat, kaucja przepada).
 
 Przy obecnym balansie prosty bot dochodzi do „Przewoźnika krajowego” po ok. 3 miesiącach gry, a po roku ma 12 aut.
 

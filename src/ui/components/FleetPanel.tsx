@@ -6,7 +6,8 @@ import { dutyAfterIdle } from '../../engine/drivingRules';
 import { formatClock, formatDuration, formatGameTime } from '../../engine/time';
 import type { Snapshot, TruckView } from '../../engine/view';
 import { city, km, pct, pln } from '../format';
-import { StatBars, TraitChips, wearColor } from './driverUi';
+import { ScoreBadge, StatBars, TraitChips, wearColor } from './driverUi';
+import { DriverPicker } from './Pairing';
 import { CandidatesList, DriversList, Showroom } from './Staffing';
 
 /**
@@ -32,7 +33,8 @@ const stop = (fn: () => void) => (e: { stopPropagation(): void }) => {
   fn();
 };
 
-function StatusBlock({ t, now, freeDrivers, a, onStaff }: { t: TruckView; now: number; freeDrivers: Snapshot['drivers']; a: FleetActions; onStaff: () => void }) {
+function StatusBlock({ t, snap, a, onStaff }: { t: TruckView; snap: Snapshot; a: FleetActions; onStaff: () => void }) {
+  const now = snap.now;
   const { trip, truck } = t;
 
   if (t.status === 'service') {
@@ -54,17 +56,8 @@ function StatusBlock({ t, now, freeDrivers, a, onStaff }: { t: TruckView; now: n
         </div>
         <div className="fc-idle-cost">Rata leasingu idzie dalej: {pln(truck.leasePerDay)}/dzień</div>
         <div className="fc-actions" onClick={(e) => e.stopPropagation()}>
-          {freeDrivers.length > 0 ? (
-            <select defaultValue="" aria-label="Przypisz kierowcę" onChange={(e) => e.target.value && a.assign(truck.id, e.target.value)}>
-              <option value="" disabled>
-                Przypisz kierowcę…
-              </option>
-              {freeDrivers.map((d) => (
-                <option key={d.driver.id} value={d.driver.id}>
-                  {d.driver.nickname} · {pln(d.driver.salaryPerDay)}/dzień
-                </option>
-              ))}
-            </select>
+          {snap.drivers.some((d) => !d.onTrip) ? (
+            <DriverPicker snap={snap} t={t} a={a} placeholder="Przypisz kierowcę…" />
           ) : (
             <button className="btn small primary" onClick={onStaff}>
               Zatrudnij kierowcę
@@ -139,7 +132,8 @@ function StatusBlock({ t, now, freeDrivers, a, onStaff }: { t: TruckView; now: n
   );
 }
 
-function Details({ t, now, a }: { t: TruckView; now: number; a: FleetActions }) {
+function Details({ t, snap, a }: { t: TruckView; snap: Snapshot; a: FleetActions }) {
+  const now = snap.now;
   const { driver: d, truck } = t;
   const bonusAt = d?.lastBonusAt === undefined ? 0 : d.lastBonusAt + BALANCE.bonusCooldownDays * 24 * 60;
   const idle = !t.trip && t.status !== 'service';
@@ -186,6 +180,7 @@ function Details({ t, now, a }: { t: TruckView; now: number; a: FleetActions }) 
       {d && <p className="quirk">{d.quirk}</p>}
       {idle && (
         <div className="fc-actions">
+          {d && <DriverPicker snap={snap} t={t} a={a} placeholder="Zmień kierowcę…" />}
           {d && (
             <button className="btn small" onClick={() => a.assign(truck.id, null)} title="Kierowca zostaje w firmie bez auta">
               Zdejmij kierowcę
@@ -202,19 +197,17 @@ function Details({ t, now, a }: { t: TruckView; now: number; a: FleetActions }) 
 
 function TruckCard({
   t,
-  now,
+  snap,
   selected,
   expanded,
-  freeDrivers,
   a,
   onToggle,
   onStaff,
 }: {
   t: TruckView;
-  now: number;
+  snap: Snapshot;
   selected: boolean;
   expanded: boolean;
-  freeDrivers: Snapshot['drivers'];
   a: FleetActions;
   onToggle: () => void;
   onStaff: () => void;
@@ -240,6 +233,7 @@ function TruckCard({
               <>
                 <strong>„{driver.nickname}”</strong>
                 {driver.firstName} {driver.lastName}
+                <ScoreBadge d={driver} />
               </>
             ) : (
               <strong className="muted">Brak kierowcy</strong>
@@ -264,7 +258,7 @@ function TruckCard({
         {t.status === 'nodriver' && <span className="fc-pill">Bez kierowcy</span>}
       </header>
 
-      <StatusBlock t={t} now={now} freeDrivers={freeDrivers} a={a} onStaff={onStaff} />
+      <StatusBlock t={t} snap={snap} a={a} onStaff={onStaff} />
 
       <footer className="fc-foot">
         {driver ? <TraitChips d={driver} /> : <span style={{ flex: 1 }} />}
@@ -276,7 +270,7 @@ function TruckCard({
         </button>
       </footer>
 
-      {expanded && <Details t={t} now={now} a={a} />}
+      {expanded && <Details t={t} snap={snap} a={a} />}
     </article>
   );
 }
@@ -299,7 +293,6 @@ export function FleetPanel({ snap, selectedId, a }: { snap: Snapshot; selectedId
   const idle = snap.fleet.filter((t) => t.status === 'idle' || t.status === 'nodriver').length;
   const service = snap.fleet.filter((t) => t.status === 'service').length;
   const moving = snap.fleet.length - idle - service;
-  const freeDrivers = snap.drivers.filter((d) => !d.truckId);
   const { fleetCap, driverCap } = snap.company;
   const toggle = (id: string) =>
     setExpanded((prev) => {
@@ -339,10 +332,9 @@ export function FleetPanel({ snap, selectedId, a }: { snap: Snapshot; selectedId
             <TruckCard
               key={t.truck.id}
               t={t}
-              now={snap.now}
+              snap={snap}
               selected={t.truck.id === selectedId}
               expanded={expanded.has(t.truck.id)}
-              freeDrivers={freeDrivers}
               a={a}
               onToggle={() => toggle(t.truck.id)}
               onStaff={() => setView('hire')}

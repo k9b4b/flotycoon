@@ -182,7 +182,7 @@ describe('giełda', () => {
 });
 
 describe('progresja i rynek', () => {
-  it('kierowcy i auta są osobno: zwolnienie zostawia auto bez kierowcy, zatrudnienie je obsadza', async () => {
+  it('kierowcy i auta są osobno: zwolnienie zostawia auto bez kierowcy, obsadza je dopiero gracz', async () => {
     const E = await import('../src/engine/sim');
     const s = newGame(31);
     const t = s.trucks[0];
@@ -193,8 +193,37 @@ describe('progresja i rynek', () => {
     expect(E.acceptJob(s, s.market[0].id, t.id).ok).toBe(false);
     const c = s.candidates[0];
     expect(E.hireDriver(s, c.id).ok).toBe(true);
-    expect(t.driverId).not.toBeNull();
+    expect(t.driverId).toBeNull(); // bez automatu
+    const nd = s.drivers.at(-1)!;
+    expect(E.assignDriver(s, t.id, nd.id).ok).toBe(true);
     expect(E.isAvailable(t)).toBe(true);
+  });
+
+  it('przesadzenie kierowcy do obsadzonego auta zamienia kierowców miejscami', async () => {
+    const E = await import('../src/engine/sim');
+    const s = newGame(36);
+    s.cash = 1_000_000;
+    expect(E.leaseOffer(s, s.truckOffers[0].id).ok).toBe(true);
+    const [t1, t2] = s.trucks;
+    expect(t2.driverId).toBeNull(); // leasing nie przydziela kierowcy
+    const d1 = s.drivers[0];
+    expect(E.hireDriver(s, s.candidates[0].id).ok).toBe(true);
+    const d2 = s.drivers.at(-1)!;
+    expect(E.assignDriver(s, t2.id, d2.id).ok).toBe(true);
+    // zamiana
+    expect(E.assignDriver(s, t2.id, d1.id).ok).toBe(true);
+    expect(t2.driverId).toBe(d1.id);
+    expect(t1.driverId).toBe(d2.id);
+    // kierowca bez auta wypycha obecnego
+    expect(E.hireDriver(s, s.candidates[0].id).ok).toBe(true);
+    const d3 = s.drivers.at(-1)!;
+    expect(E.assignDriver(s, t1.id, d3.id).ok).toBe(true);
+    expect(t1.driverId).toBe(d3.id);
+    expect(E.truckOfDriver(s, d2)).toBeNull();
+    // auto w trasie: zmiana zablokowana
+    t1.tripId = 'x';
+    expect(E.assignDriver(s, t1.id, d2.id).ok).toBe(false);
+    expect(E.assignDriver(s, t2.id, d3.id).ok).toBe(false);
   });
 
   it('limit placu blokuje leasing, rozbudowa wymaga rangi', async () => {

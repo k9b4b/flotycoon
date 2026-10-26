@@ -545,3 +545,22 @@ select {
 .up-card .btn { align-self: flex-start; white-space: normal; text-align: left; }
 .switch { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
 .switch input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+/* Ręczne parowanie kierowca–auto */
+.score-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 5px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  vertical-align: 1px;
+}
+.pair-select {
+  max-width: 100%;
+  min-width: 0;
+  flex: 1 1 220px;
+  text-overflow: ellipsis;
+}

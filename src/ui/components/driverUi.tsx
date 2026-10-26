@@ -62,3 +62,18 @@ export function StatBars({ d, skipMorale = false }: { d: Driver; skipMorale?: bo
     </div>
   );
 }
+
+/** Ogólna ocena kierowcy 0–100: średnia umiejętności (bez morale, które się zmienia). */
+export function driverScore(d: Driver): number {
+  const s = d.stats;
+  return Math.round((s.experience + s.eco + s.reliability + s.stamina) / 4);
+}
+
+export function ScoreBadge({ d }: { d: Driver }) {
+  const v = driverScore(d);
+  return (
+    <span className="score-badge num" style={{ color: statColor(v), borderColor: statColor(v) }} title="Ocena: średnia doświadczenia, eco-drivingu, niezawodności i kondycji">
+      {v}
+    </span>
+  );
+}

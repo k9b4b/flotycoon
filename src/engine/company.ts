@@ -151,10 +151,8 @@ export function hireDriver(s: GameState, candidateId: string): ActionResult {
   s.candidates = s.candidates.filter((x) => x.id !== candidateId);
   const d: Driver = { ...c, id: newId(s, 'd'), hiredAt: s.now, duty: FRESH_DUTY(s.now - 24 * 60) };
   s.drivers.push(d);
-  // Wolne auto bez kierowcy dostaje nowego od razu: oszczędza klikania.
-  const free = s.trucks.find((t) => !t.driverId && !t.tripId);
-  if (free) free.driverId = d.id;
-  const msg = `Zatrudniono: ${driverName(d)}${free ? ` i od razu do ${free.brand} ${free.model}` : ''}. ${d.quirk}`;
+  // Bez automatycznego przydziału: gracz sam decyduje, kto czym jeździ.
+  const msg = `Zatrudniono: ${driverName(d)}. Czeka na przydział auta. ${d.quirk}`;
   log(s, 'good', msg);
   return { ok: true, message: msg };
 }
@@ -173,7 +171,11 @@ export function fireDriver(s: GameState, driverId: string): ActionResult {
   return { ok: true, message: msg };
 }
 
-/** Przesadza kierowcę do auta (albo zdejmuje go z auta, gdy driverId = null). */
+/**
+ * Przesadza kierowcę do auta (albo zdejmuje go z auta, gdy driverId = null).
+ * Jeśli auto ma już kierowcę, a przesadzany kierowca siedział w innym aucie, zamieniają się miejscami.
+ * Jeśli przesadzany nie miał auta, dotychczasowy kierowca zostaje bez auta.
+ */
 export function assignDriver(s: GameState, truckId: string, driverId: string | null): ActionResult {
   const t = s.trucks.find((x) => x.id === truckId);
   if (!t) return { ok: false, error: 'Nie ma takiego auta.' };
@@ -185,10 +187,14 @@ export function assignDriver(s: GameState, truckId: string, driverId: string | n
   const d = s.drivers.find((x) => x.id === driverId);
   if (!d) return { ok: false, error: 'Nie ma takiego kierowcy.' };
   const current = truckOfDriver(s, d);
+  if (current === t) return { ok: true, message: `${d.nickname} już jeździ tym autem.` };
   if (current?.tripId) return { ok: false, error: `${d.nickname} jest w trasie innym autem.` };
-  if (current) current.driverId = null;
+  const other = driverOfTruck(s, t);
+  if (current) current.driverId = other ? other.id : null;
   t.driverId = d.id;
-  const msg = `${d.nickname} przesiada się do ${t.brand} ${t.model} (${t.plate}).`;
+  let msg = `${d.nickname} przesiada się do ${t.brand} ${t.model} (${t.plate}).`;
+  if (other && current) msg += ` ${other.nickname} bierze ${current.brand} ${current.model} (${current.plate}).`;
+  else if (other) msg += ` ${other.nickname} zostaje bez auta.`;
   log(s, 'info', msg);
   return { ok: true, message: msg };
 }
@@ -202,12 +208,10 @@ export function leaseOffer(s: GameState, offerId: string): ActionResult {
   if (s.cash < o.deposit) return { ok: false, error: `Kaucja to ${fmtPLN(o.deposit)}.` };
   spend(s, o.deposit, 'fleet');
   s.truckOffers = s.truckOffers.filter((x) => x.id !== offerId);
-  // Pierwszy wolny kierowca bez auta od razu dostaje kluczyki.
-  const idleDriver = s.drivers.find((d) => !truckOfDriver(s, d));
-  const t = truckFromOffer({ ...o, id: newId(s, 't') }, HOME_BASE, idleDriver?.id ?? null);
+  // Bez automatycznego przydziału: kluczyki wręcza gracz.
+  const t = truckFromOffer({ ...o, id: newId(s, 't') }, HOME_BASE, null);
   s.trucks.push(t);
-  const who = idleDriver ? ` Kluczyki dostaje ${idleDriver.nickname}.` : ' Na razie bez kierowcy.';
-  const msg = `${o.condition === 'new' ? 'Nowiutki' : 'Używany'} ${t.brand} ${t.model} (${t.plate}) na placu.${who}`;
+  const msg = `${o.condition === 'new' ? 'Nowiutki' : 'Używany'} ${t.brand} ${t.model} (${t.plate}) na placu. Czeka na kierowcę.`;
   log(s, 'good', msg);
   return { ok: true, message: msg };
 }

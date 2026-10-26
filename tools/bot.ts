@@ -5,6 +5,7 @@
 import { RANKS, UPGRADES, YARD } from '../src/data/progression';
 import {
   acceptJob,
+  assignDriver,
   bestSafeJob,
   buyUpgrade,
   driverCap,
@@ -55,7 +56,12 @@ export function botTick(s: GameState, opts: { grow?: boolean } = {}) {
       hireDriver(s, cand.id);
     }
   }
-  // Kierowca bez auta? Przy pełnym placu po prostu czeka (bot go nie zwalnia).
-  void s.drivers.filter((d) => !truckOfDriver(s, d));
+  // Gra nie łączy par sama: bot sadza wolnych kierowców w puste auta na placu.
+  const freeDrivers = s.drivers.filter((d) => !truckOfDriver(s, d));
+  for (const t of s.trucks.filter((x) => !x.driverId && !x.tripId)) {
+    const d = freeDrivers.shift();
+    if (!d) break;
+    assignDriver(s, t.id, d.id);
+  }
   void RANKS;
 }

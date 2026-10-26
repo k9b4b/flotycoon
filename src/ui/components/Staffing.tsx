@@ -2,26 +2,30 @@ import { BALANCE } from '../../data/balance';
 import { MARKETS, RANKS } from '../../data/progression';
 import type { Snapshot } from '../../engine/view';
 import { km, pct, pln } from '../format';
-import { StatBars, TraitChips, wearColor } from './driverUi';
+import { ScoreBadge, StatBars, TraitChips, wearColor } from './driverUi';
+import { TruckPicker } from './Pairing';
 import type { FleetActions } from './FleetPanel';
 
 /** Kadry, rynek pracy i salon aut: trzy widoki panelu floty. */
 
 export function DriversList({ snap, a, onHire }: { snap: Snapshot; a: FleetActions; onHire: () => void }) {
-  // Auta bez kierowcy, które można obsadzić teraz (stoją na placu).
-  const emptyTrucks = snap.fleet.filter((t) => t.status === 'nodriver');
   const drivers = [...snap.drivers].sort((x, y) => Number(!!x.truckId) - Number(!!y.truckId));
   return (
     <>
       <p className="staff-note muted">
-        Kierowców może być o kilku więcej niż aut (zmiennicy). Kierowca bez auta kosztuje pensję i nudzi się, więc spada mu morale.
+        Kto czym jeździ, decydujesz sam. Przesadzenie do zajętego auta zamienia kierowców miejscami (o ile żaden nie jest w trasie). Liczba przy
+        nazwisku to ocena: średnia umiejętności. Kierowców może być o kilku więcej niż aut (zmiennicy), ale kierowca bez auta kosztuje pensję i
+        nudzi się, więc spada mu morale.
       </p>
-      {drivers.map(({ driver: d, truckId, truckLabel, onTrip }) => (
+      {drivers.map((dv) => {
+        const { driver: d, truckId, truckLabel, onTrip } = dv;
+        return (
         <article key={d.id} className={`staff-card${truckId ? '' : ' is-free'}`}>
           <div className="staff-head">
             <div className="fc-driver">
               <strong>„{d.nickname}”</strong>
               {d.firstName} {d.lastName}
+              <ScoreBadge d={d} />
             </div>
             <span className="num">{pln(d.salaryPerDay)}/dzień</span>
           </div>
@@ -37,24 +41,14 @@ export function DriversList({ snap, a, onHire }: { snap: Snapshot; a: FleetActio
             <TraitChips d={d} />
           </div>
           <div className="fc-actions">
-            {!truckId && emptyTrucks.length > 0 && (
-              <select defaultValue="" aria-label={`Przydziel auto dla ${d.nickname}`} onChange={(e) => e.target.value && a.assign(e.target.value, d.id)}>
-                <option value="" disabled>
-                  Przydziel auto…
-                </option>
-                {emptyTrucks.map((t) => (
-                  <option key={t.truck.id} value={t.truck.id}>
-                    #{t.fleetNo} {t.truck.brand} {t.truck.model}
-                  </option>
-                ))}
-              </select>
-            )}
+            <TruckPicker snap={snap} dv={dv} a={a} />
             <button className="btn small danger" disabled={onTrip} onClick={() => a.fire(d.id)} title={onTrip ? 'Zwolnić można po rozładunku' : undefined}>
               Zwolnij (odprawa {pln(d.salaryPerDay * MARKETS.severanceDays)})
             </button>
           </div>
         </article>
-      ))}
+        );
+      })}
       <button className="btn" onClick={onHire}>
         Zobacz kandydatów na rynku pracy
       </button>
@@ -80,6 +74,7 @@ export function CandidatesList({ snap, a }: { snap: Snapshot; a: FleetActions })
             <div className="fc-driver">
               <strong>„{c.nickname}”</strong>
               {c.firstName} {c.lastName}
+              <ScoreBadge d={c} />
             </div>
             <span className="num" title="Oczekiwana pensja">
               {pln(c.salaryPerDay)}/dzień

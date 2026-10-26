@@ -4,7 +4,7 @@ import type { Snapshot } from '../../engine/view';
 import { km, pct, pln } from '../format';
 import { PerkList, ScoreBadge, StatBars, TraitChips, wearColor } from './driverUi';
 import { TruckPicker } from './Pairing';
-import { DriverAvatar } from '../avatar';
+import { DriverAvatar, TruckSprite } from '../avatar';
 import type { FleetActions } from './FleetPanel';
 
 /** Kadry, rynek pracy i salon aut: trzy widoki panelu floty. */
@@ -110,7 +110,8 @@ export function Showroom({ snap, a }: { snap: Snapshot; a: FleetActions }) {
       {snap.truckOffers.length === 0 && <div className="empty">Handlarz pojechał po nowe auta do Niemiec.</div>}
       {snap.truckOffers.map((o) => (
         <article key={o.id} className="staff-card">
-          <div className="staff-head">
+          <div className="staff-head with-avatar">
+            <TruckSprite t={o} scale={3} />
             <div className="fc-driver">
               <strong>
                 {o.brand} {o.model}

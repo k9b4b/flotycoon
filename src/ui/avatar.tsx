@@ -1,5 +1,6 @@
 import type { Driver } from '../engine/types';
 import { portraitSvg } from './portrait';
+import { truckSvg, type TruckLook } from './truckSprite';
 
 /**
  * Pikselowy portret kierowcy (ui/portrait.ts), z pamięcią podręczną: generujemy raz na osobę i nastrój.
@@ -19,4 +20,18 @@ export function DriverAvatar({ d, size = 44 }: { d: Driver; size?: number }) {
   }
   const html = size < 64 ? svg.replace('viewBox="0 0 32 32"', 'viewBox="4 4 24 24"') : svg;
   return <span className="avatar" style={{ width: size, height: size }} aria-hidden dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+const truckCache = new Map<string, string>();
+
+/** Pikselowy ciągnik (ui/truckSprite.ts) w skali całkowitej, z pamięcią podręczną. */
+export function TruckSprite({ t, scale = 2 }: { t: TruckLook; scale?: number }) {
+  const key = `${t.plate}|${t.brand}|${t.model}|${Math.round(t.wear * 20)}|${t.condition ?? ''}`;
+  let svg = truckCache.get(key);
+  if (!svg) {
+    svg = truckSvg({ ...t, wear: Math.round(t.wear * 20) / 20 });
+    if (truckCache.size > 400) truckCache.clear();
+    truckCache.set(key, svg);
+  }
+  return <span className="truck-sprite" style={{ width: 44 * scale, height: 28 * scale }} aria-hidden dangerouslySetInnerHTML={{ __html: svg }} />;
 }

@@ -685,3 +685,12 @@ select {
 .fc-who .fc-driver strong, .staff-head.with-avatar .fc-driver strong, .dec-who .fc-driver strong { display: block; }
 .staff-head.with-avatar { align-items: center; justify-content: flex-start; }
 .staff-head.with-avatar .fc-driver { flex: 1; min-width: 0; }
+
+/* Pikselowe ciągniki (ui/truckSprite.ts) */
+.truck-sprite { flex: none; display: inline-block; }
+.truck-sprite svg { width: 100%; height: 100%; display: block; }
+.fc-right { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.staff-head.with-avatar .truck-sprite { background: #2a3442; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--line-strong); }
+@media (max-width: 720px) {
+  .staff-head.with-avatar .truck-sprite { width: 88px !important; height: 56px !important; }
+}

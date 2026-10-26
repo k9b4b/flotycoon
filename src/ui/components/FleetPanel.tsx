@@ -8,7 +8,7 @@ import type { Snapshot, TruckView } from '../../engine/view';
 import { city, km, pct, pln } from '../format';
 import { PerkList, ScoreBadge, StatBars, TraitChips, wearColor } from './driverUi';
 import { DriverPicker } from './Pairing';
-import { DriverAvatar } from '../avatar';
+import { DriverAvatar, TruckSprite } from '../avatar';
 import { CandidatesList, DriversList, Showroom } from './Staffing';
 
 /**
@@ -255,8 +255,11 @@ function TruckCard({
             </span>
           </div>
         </div>
-        {t.status === 'idle' && <span className="fc-pill">Wolny</span>}
-        {t.status === 'nodriver' && <span className="fc-pill">Bez kierowcy</span>}
+        <div className="fc-right">
+          <TruckSprite t={truck} />
+          {t.status === 'idle' && <span className="fc-pill">Wolny</span>}
+          {t.status === 'nodriver' && <span className="fc-pill">Bez kierowcy</span>}
+        </div>
       </header>
 
       <StatusBlock t={t} snap={snap} a={a} onStaff={onStaff} />

@@ -10,8 +10,9 @@ graphhopper:
   profiles:
     - name: truck
       custom_model_files: [truck.json]
-  profiles_ch:
-    - profile: truck
+  # Bez profiles_ch: preprocessing CH trwa długo, a do ~100 zapytań wystarczy zwykłe wyszukiwanie.
+  profiles_ch: []
+  profiles_lm: []
 
 server:
   application_connectors:

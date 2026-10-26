@@ -20,7 +20,7 @@ env:
 jobs:
   routes:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -45,12 +45,15 @@ jobs:
 
       - name: Import grafu i start serwera
         run: |
-          java -Xmx6g -jar data/graphhopper.jar server tools/routes/config.yml > data/gh.log 2>&1 &
-          for i in $(seq 1 540); do
+          java -Xmx10g -jar data/graphhopper.jar server tools/routes/config.yml > data/gh.log 2>&1 &
+          PID=$!
+          for i in $(seq 1 360); do
             if curl -sf http://localhost:8989/health > /dev/null; then echo "Serwer gotowy po $((i * 10)) s"; exit 0; fi
+            if ! kill -0 $PID 2>/dev/null; then echo "GraphHopper zakończył się błędem:"; tail -n 80 data/gh.log; exit 1; fi
+            if [ $((i % 6)) -eq 0 ]; then echo "[$((i / 6)) min] $(tail -n 1 data/gh.log | cut -c1-200)"; fi
             sleep 10
           done
-          echo "GraphHopper nie wystartował"; tail -n 80 data/gh.log; exit 1
+          echo "GraphHopper nie wystartował w 60 min"; tail -n 80 data/gh.log; exit 1
 
       - name: Policz trasy
         run: npx tsx tools/routes/build-routes.ts

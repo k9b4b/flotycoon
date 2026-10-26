@@ -656,17 +656,18 @@ select {
 .job:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .job-actions { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; padding-top: 4px; }
 
-/* Twarze kierowców (Open Peeps, CC0) */
+/* Pikselowe twarze kierowców (DiceBear Pixel Art, CC0) */
 .avatar {
   flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
-  background: #ece6da;
+  background: #2a3442;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
 }
-.avatar svg { width: 100%; height: 100%; display: block; }
+.avatar svg { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
 .avatar-empty { width: 48px; height: 48px; background: var(--panel-2); border: 1px dashed var(--line-strong); color: var(--muted); font-weight: 700; font-size: 18px; }
 .fc-id { position: relative; flex: none; display: inline-flex; padding: 6px 0 0 6px; }
 .fc-id .fc-no {

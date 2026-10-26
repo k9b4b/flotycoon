@@ -16,6 +16,8 @@ permissions:
 
 env:
   GH_VERSION: '10.0'
+  # Ostatnie linie logu jako adnotacja (widoczna w podsumowaniu przebiegu i przez API).
+  ANNOTATE_LOG: tail -n 40 data/gh.log | cut -c1-300 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}'
 
 jobs:
   routes:
@@ -49,18 +51,18 @@ jobs:
           PID=$!
           for i in $(seq 1 360); do
             if curl -sf http://localhost:8989/health > /dev/null; then echo "Serwer gotowy po $((i * 10)) s"; exit 0; fi
-            if ! kill -0 $PID 2>/dev/null; then echo "GraphHopper zakończył się błędem:"; tail -n 80 data/gh.log; exit 1; fi
-            if [ $((i % 6)) -eq 0 ]; then echo "[$((i / 6)) min] $(tail -n 1 data/gh.log | cut -c1-200)"; fi
+            if ! kill -0 $PID 2>/dev/null; then echo "::error title=GraphHopper padł::$(eval "$ANNOTATE_LOG")"; exit 1; fi
+            if [ $((i % 60)) -eq 0 ]; then echo "::notice title=Import $((i / 6)) min::$(tail -n 1 data/gh.log | cut -c1-250)"; fi
             sleep 10
           done
-          echo "GraphHopper nie wystartował w 60 min"; tail -n 80 data/gh.log; exit 1
+          echo "::error title=GraphHopper nie wystartował w 60 min::$(eval "$ANNOTATE_LOG")"; exit 1
 
       - name: Policz trasy
-        run: npx tsx tools/routes/build-routes.ts
+        run: npx tsx tools/routes/build-routes.ts 2>&1 | tee data/routes.log; test ${PIPESTATUS[0]} -eq 0 || { echo "::error title=Liczenie tras::$(tail -n 30 data/routes.log | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"; exit 1; }
 
       - name: Log GraphHoppera (przy błędzie)
         if: failure()
-        run: tail -n 120 data/gh.log || true
+        run: echo "::error title=Log GraphHoppera::$(eval "$ANNOTATE_LOG")" || true
 
       - name: Zapisz wynik w repozytorium
         run: |

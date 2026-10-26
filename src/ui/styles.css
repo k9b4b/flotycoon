@@ -314,6 +314,7 @@ select {
 .fc-driver { font-size: 13px; color: var(--muted); line-height: 1.3; }
 .fc-driver strong { font-size: 17px; font-weight: 700; color: var(--text); margin-right: 6px; }
 .fc-truck { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.wear-label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
 .fc-wear { width: 44px; height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; }
 .fc-wear > span { display: block; height: 100%; }
 .fc-pill {

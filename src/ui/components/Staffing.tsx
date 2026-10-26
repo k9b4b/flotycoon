@@ -124,8 +124,12 @@ export function Showroom({ snap, a }: { snap: Snapshot; a: FleetActions }) {
             <span>{km(o.odometerKm)}</span>
             <span>Euro {o.euro}</span>
             <span>{o.fuelL100} l/100</span>
-            <span className="fc-wear" title={`Zużycie ${pct(o.wear)}`}>
-              <span style={{ width: pct(o.wear), background: wearColor(o.wear) }} />
+            <span className="wear-label" title="Zużycie: im wyższe, tym częstsze awarie i wyższe spalanie. Serwis je obniża, ale nie poniżej poziomu wynikającego z przebiegu.">
+              zużycie
+              <span className="fc-wear">
+                <span style={{ width: pct(o.wear), background: wearColor(o.wear) }} />
+              </span>
+              <span style={{ color: wearColor(o.wear) }}>{pct(o.wear)}</span>
             </span>
           </div>
           <div className="staff-line">

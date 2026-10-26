@@ -250,8 +250,13 @@ function TruckCard({
               {truck.brand} {truck.model}
             </span>
             <span className="plate">{truck.plate}</span>
-            <span className="fc-wear" title={`Zużycie ${pct(truck.wear)}: wpływa na awarie i spalanie`}>
-              <span style={{ width: pct(truck.wear), background: wearColor(truck.wear) }} />
+            <span className="wear-label" title="Zużycie: im wyższe, tym częstsze awarie i wyższe spalanie. Serwis je obniża, ale nie poniżej poziomu wynikającego z przebiegu.">
+              <span className="fc-wear">
+                <span style={{ width: pct(truck.wear), background: wearColor(truck.wear) }} />
+              </span>
+              <span className="num" style={{ color: wearColor(truck.wear) }}>
+                {pct(truck.wear)}
+              </span>
             </span>
           </div>
         </div>

@@ -47,6 +47,9 @@ const SHAPES: Record<string, CabShape> = {
   DAFF: { top: 1, slope: 1, round: 0, spoiler: true, skirt: true },
   Merceles: { top: 3, slope: 3, round: 3, spoiler: false, skirt: true },
   Iweko: { top: 4, slope: 3, round: 2, spoiler: false, skirt: false },
+  Renolt: { top: 4, slope: 2, round: 1, spoiler: false, skirt: false },
+  // Magnum: wysoka, prawie pionowa „szafa” z płaską podłogą.
+  'Renolt Magnum': { top: 0, slope: 0, round: 0, spoiler: false, skirt: true },
 };
 
 const PAINTS = [
@@ -97,7 +100,7 @@ class Grid {
 
 export function truckSvg(t: TruckLook): string {
   const r = createRng(hash(`${t.plate}|${t.brand}|${t.model}`));
-  const base = SHAPES[t.brand] ?? SHAPES.MEN;
+  const base = SHAPES[`${t.brand} ${t.model.split(' ')[0]}`] ?? SHAPES[t.brand] ?? SHAPES.MEN;
   // Wersje „S”, „XF”, „FH” i podobne mają wyższe kabiny; liczba w modelu nie zmienia sylwetki.
   const tall = /^S\b|XF|FH|S-Way/.test(t.model);
   const shape: CabShape = { ...base, top: Math.max(1, base.top - (tall ? 1 : 0)) };

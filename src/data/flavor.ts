@@ -8,6 +8,9 @@ export const TRUCK_MODELS = [
   { brand: 'DAFF', model: 'XF 480', fuelL100: 29.5 },
   { brand: 'Merceles', model: 'Actros 1845', fuelL100: 29.0 },
   { brand: 'Iweko', model: 'S-Way 490', fuelL100: 32.0 },
+  { brand: 'Renolt', model: 'Premium 450 DXi', fuelL100: 30.5 },
+  // Legenda z płaską podłogą. Nie produkują jej od lat, więc trafia się tylko używana.
+  { brand: 'Renolt', model: 'Magnum 480', fuelL100: 32.5, usedOnly: true },
 ] as const;
 
 export const MALE_NAMES = ['Zbigniew', 'Mirosław', 'Krzysztof', 'Janusz', 'Mariusz', 'Dariusz', 'Tadeusz', 'Sławomir', 'Henryk', 'Ryszard', 'Waldemar', 'Grzegorz'];

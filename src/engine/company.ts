@@ -127,7 +127,7 @@ export function usedOffer(s: GameState): TruckOffer {
 
 function newOffer(s: GameState): TruckOffer {
   const r = s.rng;
-  const m = pick(r, TRUCK_MODELS);
+  const m = pick(r, TRUCK_MODELS.filter((x) => !('usedOnly' in x)));
   return {
     id: newId(s, 'o'),
     plate: randomPlate(r),

@@ -8,6 +8,7 @@ import type { Snapshot, TruckView } from '../../engine/view';
 import { city, km, pct, pln } from '../format';
 import { PerkList, ScoreBadge, StatBars, TraitChips, wearColor } from './driverUi';
 import { DriverPicker } from './Pairing';
+import { DriverAvatar } from '../avatar';
 import { CandidatesList, DriversList, Showroom } from './Staffing';
 
 /**
@@ -221,8 +222,11 @@ function TruckCard({
   return (
     <article className={cls} onClick={() => a.select(truck.id)} data-status={t.status}>
       <header className="fc-head">
-        <span className="fc-no num" title="Numer zestawu (ten sam na mapie)">
-          {t.fleetNo}
+        <span className="fc-id">
+          {driver ? <DriverAvatar d={driver} size={48} /> : <span className="avatar avatar-empty">?</span>}
+          <span className="fc-no num" title="Numer zestawu (ten sam na mapie)">
+            {t.fleetNo}
+          </span>
         </span>
         <div className="fc-who">
           <div className="fc-driver">

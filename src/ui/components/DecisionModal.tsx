@@ -1,5 +1,6 @@
 import { formatDuration } from '../../engine/time';
 import type { DecisionView } from '../../engine/view';
+import { DriverAvatar } from '../avatar';
 import { ScoreBadge, TraitChips } from './driverUi';
 
 /**
@@ -20,7 +21,10 @@ export function DecisionModal({ d, more, onChoose, onShow }: { d: DecisionView; 
         </div>
         <h2 id="dec-title">{d.title}</h2>
         <div className="dec-who">
-          <span className="fc-no num">{d.fleetNo}</span>
+          <span className="fc-id">
+            <DriverAvatar d={d.driver} size={56} />
+            <span className="fc-no num">{d.fleetNo}</span>
+          </span>
           <div>
             <div className="fc-driver">
               <strong>„{d.driver.nickname}”</strong> {d.driver.firstName} {d.driver.lastName}

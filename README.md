@@ -90,6 +90,7 @@ Przy obecnym balansie prosty bot dochodzi do „Przewoźnika krajowego” po ok.
 - **Przepisy:** 4,5 h jazdy / 45 min przerwy, 9 h jazdy / 11 h odpoczynku. Uproszczenia opisane w `drivingRules.ts`.
 - **Ekonomia:** fracht, paliwo, myto, pensje, leasing, naprawy, mandaty, kary za spóźnienie. Struktura kosztów na dashboardzie.
 - **Giełda:** zlecenia generowane proceduralnie, z terminami i wyceną dla wybranego zestawu (dojazd, ETA, zysk, czy zdąży).
+- **Twarze kierowców** (`ui/avatar.tsx`): rysunki Open Peeps (Pablo Stanley, CC0) skopiowane z DiceBear (kod MIT) do `src/vendor/open-peeps/`. Wygląd jest stały dla osoby (ziarno z imienia, nazwiska i ksywki) i podąża za kierowcą: siwizna u doświadczonych, wąsy, okulary u „Teczki z papierami”, ciemne okulary u pirata; mina zmienia się z morale.
 - **Humor:** parodie marek, klienci, ładunki, zdarzenia drogowe i biurowe w `data/flavor.ts`.
 
 Wszystkie liczby balansu są w `data/balance.ts`. Wartości rynkowe (diesel, e-TOLL, stawki) to robocze przybliżenia do kalibracji. Obecnie prosty bot z `sim:year` (logika w `tools/bot.ts`) rośnie w rok do 12 aut, więc rozsądny gracz zarabia więcej, a nieuważny bankrutuje.

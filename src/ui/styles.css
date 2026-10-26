@@ -271,6 +271,7 @@ select {
 .job .calc { grid-column: 1 / -1; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; font-size: 12px; }
 
 /* ── Dziennik ──────────────────────────────────────── */
+.log-scroll { max-height: 260px; }
 .log-entry { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 8px; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 13px; }
 .log-entry .t { font-family: var(--mono); font-size: 11px; color: var(--faint); padding-top: 2px; }
 .log-entry.good .text { color: var(--good); }
@@ -341,6 +342,7 @@ select {
   .grid[data-tab='company'] > .area-cash,
   .grid[data-tab='company'] > .area-costs { display: flex; }
   .grid[data-tab] .scroll { max-height: none; overflow: visible; }
+  .log-entry .text { min-width: 0; overflow-wrap: anywhere; }
 
   .fleet-map { height: min(62dvh, 560px); }
   .map-legend { gap: 6px 12px; font-size: 11px; }

@@ -98,6 +98,6 @@ export const DAILY_FLAVOR = [
 ];
 
 export const COMPANY_START = [
-  'Założono firmę {company}. Kapitał: {cash}, jeden używany ciągnik i dużo optymizmu.',
+  'Założono firmę {company}, kapitał: {cash}, jeden używany ciągnik i dużo optymizmu.',
   'Księgowa: „Proszę nie wrzucać faktur do szuflady z ketchupem”. Zaczynamy.',
 ];

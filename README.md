@@ -66,6 +66,21 @@ Lokalnie (Java 17+, ok. 6 GB RAM dla Polski): pobierz `graphhopper-web-<wersja>.
 
 Profil ciężarówki (`tools/routes/flotruck.json`) omija drogi z ograniczeniem masy poniżej 40 t i wysokości poniżej 4 m oraz limituje prędkość do 85 km/h. Silnik gry nadal liczy czas przejazdu po swojemu (statystyki kierowcy, przepisy); z GraphHoppera bierze tylko dystans i przebieg drogi.
 
+## Progresja
+
+Firma awansuje dzięki **reputacji**: terminowy kurs daje punkt (pilny dwa), spóźnienie zabiera 4, mandat z ITD 2. Rangi (`data/progression.ts`): „Jeden gość z Iveco” → „Firma krzak” → „Lokalny przewoźnik” → „Przewoźnik krajowy” → „Spedycja z ambicjami” → „Gracz z prawdziwego zdarzenia” → „Potentat ze Strykowa”.
+
+Ranga odblokowuje rozbudowę bazy, a im wyższa, tym lepsi kandydaci na kierowców i szersza oferta salonu:
+
+- **Plac**: limit aut (3 → 6 → 12 → 25 → 50); kierowców może być o 3 więcej.
+- **Własny warsztat**: serwis 40% taniej i dwa razy krócej.
+- **Biuro spedycji**: więcej ofert i ładunków powrotnych.
+- **Dyspozytorka Halina**: sama przydziela bezpieczne ładunki wolnym zestawom i wysyła zużyte auta do serwisu (można ją wstrzymać).
+
+**Kierowcy i auta są osobno.** Rynek pracy pokazuje kandydatów (zmiana co 2 dni) z oczekiwaną pensją rosnącą ze statystykami. Salon oferuje auta w leasingu (zmiana co 3 dni): używane z kaucją 6 000 zł, a od rangi „Lokalny przewoźnik” także nowe, oszczędniejsze i bez zużycia, ale z dwa razy wyższą ratą. Kierowcę można przesadzić do innego auta, zwolnić (odprawa 5 dniówek), a auto zwrócić (kara 5 rat, kaucja przepada).
+
+Przy obecnym balansie prosty bot dochodzi do „Przewoźnika krajowego” po ok. 3 miesiącach gry, a po roku ma 12 aut.
+
 ## Co już jest w symulacji
 
 - **Kierowca:** doświadczenie (prędkość), eco-driving (spalanie), niezawodność (kontrole ITD), kondycja (ryzyko zaspania), morale (mnożnik niezawodności, spada przy spóźnieniach i bezczynności). Pensja dzienna, przebieg, licznik czasu jazdy przechodzący między kursami.
@@ -75,21 +90,21 @@ Profil ciężarówki (`tools/routes/flotruck.json`) omija drogi z ograniczeniem 
 - **Giełda:** zlecenia generowane proceduralnie, z terminami i wyceną dla wybranego zestawu (dojazd, ETA, zysk, czy zdąży).
 - **Humor:** parodie marek, klienci, ładunki, zdarzenia drogowe i biurowe w `data/flavor.ts`.
 
-Wszystkie liczby balansu są w `data/balance.ts`. Wartości rynkowe (diesel, e-TOLL, stawki) to robocze przybliżenia do kalibracji. Obecnie prosty bot z `sim:year` ma marżę 1–2% i w rok rośnie do kilkunastu zestawów, więc rozsądny gracz zarabia więcej, a nieuważny bankrutuje.
+Wszystkie liczby balansu są w `data/balance.ts`. Wartości rynkowe (diesel, e-TOLL, stawki) to robocze przybliżenia do kalibracji. Obecnie prosty bot z `sim:year` (logika w `tools/bot.ts`) rośnie w rok do 12 aut, więc rozsądny gracz zarabia więcej, a nieuważny bankrutuje.
 
 **Giełda:** oferty pojawiają się głównie tam, gdzie stoją albo dojeżdżają nasze auta, a po każdym rozładunku dochodzą 3 ładunki powrotne z tego miasta. Każda oferta ma okno załadunku (potem znika) i termin dostawy liczony z przerwami i ewentualnym odpoczynkiem dobowym.
 
 ## Świadome uproszczenia prototypu
 
 - Trasy są policzone tylko między 13 miastami MVP. Nowe miasta wymagają ponownego uruchomienia workflow tras (do tego czasu: linia prosta × 1,15).
-- Zestaw = ciągnik + stały kierowca. Brak naczep, ADR, chłodni.
+- Brak naczep, ADR, chłodni.
 - Brak bankructwa, kredytu i limitów tygodniowych czasu jazdy.
 
 ## Następne kroki
 
-1. Realne trasy: uruchomić workflow GraphHoppera (opis wyżej).
-2. Rozdzielenie kierowców i ciągników, rekrutacja z listy kandydatów, zwolnienia.
+1. Kontrakty ze stałymi klientami (regularne trasy, pewna stawka, kary za zawalenie).
+2. Licencje: międzynarodowa (otwiera Europę), ADR, chłodnie.
 3. Naczepy (plandeka, chłodnia, ADR) i dopasowanie do ładunków.
 4. Finanse: kredyt, faktury z terminem płatności (zatory płatnicze!), bankructwo.
 5. Europa: kraje, waluty, myto, ceny paliwa, kabotaż, zakazy weekendowe, języki kierowców.
-6. Więcej zdarzeń i reputacja u klientów.
+6. Osiągnięcia i więcej zdarzeń.

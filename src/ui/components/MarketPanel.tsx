@@ -42,7 +42,7 @@ export function MarketPanel({
           <select value={active?.truck.id} onChange={(e) => onTruck(e.target.value)} aria-label="Zestaw do wyceny">
             {free.map((t) => (
               <option key={t.truck.id} value={t.truck.id}>
-                {t.driver.nickname} · {t.truck.plate} · {city(t.truck.cityId)}
+                {t.driver?.nickname} · #{t.fleetNo} · {city(t.truck.cityId)}
               </option>
             ))}
           </select>

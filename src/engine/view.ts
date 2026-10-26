@@ -1,18 +1,20 @@
 import { BALANCE } from '../data/balance';
 import { CITY_BY_ID } from '../data/cities';
 import { kmAt, phaseAt } from './drivingRules';
-import { isAvailable, previewJob, serviceQuote, type JobPreview } from './sim';
-import type { DayRecord, Driver, GameState, Job, LogEntry, Phase, PhaseKind, Truck } from './types';
+import { RANKS, UPGRADES, YARD, type Upgrade } from '../data/progression';
+import { driverCap, driverOfTruck, fleetCap, isAvailable, previewJob, rankIndex, serviceQuote, truckOfDriver, upgradesPerDay, type JobPreview } from './sim';
+import type { BaseState, DayRecord, Driver, GameState, Job, LogEntry, Phase, PhaseKind, Truck, TruckOffer } from './types';
 
 /**
  * Widok stanu dla UI. Worker wysyła go kilka razy na sekundę,
  * więc zawiera tylko to, co dashboard pokazuje (bez kolejki zdarzeń).
  */
 
-export type TruckStatus = PhaseKind | 'idle' | 'service';
+export type TruckStatus = PhaseKind | 'idle' | 'service' | 'nodriver';
 
 export const PHASE_LABEL: Record<TruckStatus, string> = {
   idle: 'Wolny',
+  nodriver: 'Bez kierowcy',
   service: 'W serwisie',
   drive_empty: 'Dojazd na pusto',
   load: 'Załadunek',
@@ -25,7 +27,8 @@ export const PHASE_LABEL: Record<TruckStatus, string> = {
 
 export interface TruckView {
   truck: Truck;
-  driver: Driver;
+  /** null = auto stoi na placu bez kierowcy. */
+  driver: Driver | null;
   /** Numer zestawu w firmie (#1, #2…), stały: ten sam na karcie i na mapie. */
   fleetNo: number;
   /** Od kiedy zestaw stoi bez zlecenia (tylko gdy status = idle). */
@@ -65,6 +68,38 @@ export interface JobView extends Job {
   previews: JobPreview[];
 }
 
+export interface DriverView {
+  driver: Driver;
+  truckId: string | null;
+  /** „#3 Skania R 450” albo null, gdy kierowca nie ma auta. */
+  truckLabel: string | null;
+  onTrip: boolean;
+}
+
+export interface UpgradeView extends Upgrade {
+  owned: boolean;
+  unlocked: boolean;
+}
+
+export interface CompanyView {
+  reputation: number;
+  rank: number;
+  rankName: string;
+  perk: string;
+  nextRankName: string | null;
+  nextRankPerk: string | null;
+  /** Postęp do następnej rangi: od, do (punkty reputacji). */
+  repFrom: number;
+  repTo: number | null;
+  base: BaseState;
+  yardName: string;
+  fleetCap: number;
+  driverCap: number;
+  nextYard: { name: string; cap: number; cost: number; unlocked: boolean; rankName: string } | null;
+  upgrades: UpgradeView[];
+  upkeepPerDay: number;
+}
+
 export interface Snapshot {
   now: number;
   cash: number;
@@ -77,6 +112,10 @@ export interface Snapshot {
   totals: GameState['totals'];
   costsByCategory: GameState['costsByCategory'];
   dailyFixedCosts: number;
+  company: CompanyView;
+  drivers: DriverView[];
+  candidates: Driver[];
+  truckOffers: TruckOffer[];
 }
 
 /**
@@ -102,14 +141,17 @@ function lerp(a: number, b: number, f: number) {
 }
 
 function truckView(s: GameState, truck: Truck, fleetNo: number): TruckView {
-  const driver = s.drivers.find((d) => d.id === truck.driverId)!;
-  const base = { truck, driver, fleetNo, costPerHour: (driver.salaryPerDay + truck.leasePerDay) / 24 };
+  const driver = driverOfTruck(s, truck);
+  const base = { truck, driver, fleetNo, costPerHour: ((driver?.salaryPerDay ?? 0) + truck.leasePerDay) / 24 };
   const here = CITY_BY_ID[truck.cityId];
-  const serviceQuoteNow = serviceQuote(truck);
+  const serviceQuoteNow = serviceQuote(s, truck);
   if (truck.serviceUntil !== null) {
     return { ...base, status: 'service', statusLabel: PHASE_LABEL.service, lat: here.lat, lon: here.lon, serviceUntil: truck.serviceUntil, serviceQuote: serviceQuoteNow };
   }
-  if (!truck.tripId) {
+  if (!truck.tripId && !driver) {
+    return { ...base, status: 'nodriver', statusLabel: PHASE_LABEL.nodriver, lat: here.lat, lon: here.lon, serviceQuote: serviceQuoteNow };
+  }
+  if (!truck.tripId && driver) {
     return {
       ...base,
       // Koniec ostatniego kursu (licznik tachografu) albo dzień zatrudnienia.
@@ -117,7 +159,7 @@ function truckView(s: GameState, truck: Truck, fleetNo: number): TruckView {
       status: 'idle',
       statusLabel: PHASE_LABEL.idle, lat: here.lat, lon: here.lon, serviceQuote: serviceQuoteNow };
   }
-  const trip = s.trips[truck.tripId];
+  const trip = s.trips[truck.tripId!];
   const km = kmAt(trip.phases, s.now);
   const total = trip.emptyKm + trip.job.km;
   const origin = CITY_BY_ID[trip.originId];
@@ -166,8 +208,32 @@ function truckView(s: GameState, truck: Truck, fleetNo: number): TruckView {
   };
 }
 
+function companyView(s: GameState): CompanyView {
+  const rank = rankIndex(s.reputation);
+  const next = RANKS[rank + 1];
+  const ny = YARD[s.base.yard + 1];
+  return {
+    reputation: s.reputation,
+    rank,
+    rankName: RANKS[rank].name,
+    perk: RANKS[rank].perk,
+    nextRankName: next?.name ?? null,
+    nextRankPerk: next?.perk ?? null,
+    repFrom: RANKS[rank].minRep,
+    repTo: next?.minRep ?? null,
+    base: s.base,
+    yardName: YARD[s.base.yard].name,
+    fleetCap: fleetCap(s),
+    driverCap: driverCap(s),
+    nextYard: ny ? { name: ny.name, cap: ny.cap, cost: ny.cost, unlocked: rank >= ny.rank, rankName: RANKS[ny.rank].name } : null,
+    upgrades: UPGRADES.map((u) => ({ ...u, owned: s.base[u.id], unlocked: rank >= u.rank })),
+    upkeepPerDay: upgradesPerDay(s),
+  };
+}
+
 export function buildSnapshot(s: GameState): Snapshot {
   const idle = s.trucks.filter(isAvailable);
+  const fleetNo = new Map(s.trucks.map((t, i) => [t.id, i + 1]));
   return {
     now: s.now,
     cash: s.cash,
@@ -181,6 +247,13 @@ export function buildSnapshot(s: GameState): Snapshot {
     today: s.today,
     totals: s.totals,
     costsByCategory: s.costsByCategory,
-    dailyFixedCosts: s.drivers.reduce((a, d) => a + d.salaryPerDay, 0) + s.trucks.reduce((a, t) => a + t.leasePerDay, 0),
+    dailyFixedCosts: s.drivers.reduce((a, d) => a + d.salaryPerDay, 0) + s.trucks.reduce((a, t) => a + t.leasePerDay, 0) + upgradesPerDay(s),
+    company: companyView(s),
+    drivers: s.drivers.map((d) => {
+      const t = truckOfDriver(s, d);
+      return { driver: d, truckId: t?.id ?? null, truckLabel: t ? `#${fleetNo.get(t.id)} ${t.brand} ${t.model}` : null, onTrip: !!t?.tripId };
+    }),
+    candidates: s.candidates,
+    truckOffers: s.truckOffers,
   };
 }

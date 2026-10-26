@@ -1,53 +1,39 @@
 import { useState } from 'react';
 import { BALANCE } from '../../data/balance';
 import { CITY_BY_ID } from '../../data/cities';
+import { MARKETS } from '../../data/progression';
 import { dutyAfterIdle } from '../../engine/drivingRules';
 import { formatClock, formatDuration, formatGameTime } from '../../engine/time';
 import type { Snapshot, TruckView } from '../../engine/view';
-import type { Driver } from '../../engine/types';
-import { city, km, pct, pln, STAT_LABELS } from '../format';
+import { city, km, pct, pln } from '../format';
+import { StatBars, TraitChips, wearColor } from './driverUi';
+import { CandidatesList, DriversList, Showroom } from './Staffing';
 
 /**
- * Karta zestawu: najpierw kto i czym jedzie, potem co robi teraz.
- * Szczegóły kierowcy i auta są zwinięte; na stałe widać tylko cechy, które coś znaczą.
+ * Flota w czterech widokach: zestawy (co jeździ), kierowcy (kadry), rynek pracy i salon aut.
+ * Karta zestawu: najpierw kto i czym jedzie, potem co robi teraz; szczegóły zwinięte.
  */
 
-interface Trait {
-  text: string;
-  tone: 'good' | 'bad';
-  hint?: string;
+export interface FleetActions {
+  select: (truckId: string) => void;
+  service: (truckId: string) => void;
+  showOnMap: (truckId: string) => void;
+  findJob: (truckId: string) => void;
+  bonus: (driverId: string) => void;
+  hire: (candidateId: string) => void;
+  fire: (driverId: string) => void;
+  assign: (truckId: string, driverId: string | null) => void;
+  lease: (offerId: string) => void;
+  returnTruck: (truckId: string) => void;
 }
 
-/** Krótkie etykiety zamiast pięciu pasków: tylko skrajne wartości mają wpływ na decyzje. */
-function traits(d: Driver): Trait[] {
-  const s = d.stats;
-  const out: Trait[] = [];
-  if (s.morale < 40) out.push({ text: 'Morale nisko', tone: 'bad', hint: 'Częściej wpada na kontrolach. Pomaga premia i terminowe kursy.' });
-  if (s.experience >= 80) out.push({ text: 'Rutyniarz', tone: 'good' });
-  else if (s.experience < 30) out.push({ text: 'Świeżak', tone: 'bad' });
-  if (s.eco >= 80) out.push({ text: 'Eco-mistrz', tone: 'good' });
-  else if (s.eco < 30) out.push({ text: 'Pali jak smok', tone: 'bad' });
-  if (s.reliability >= 80) out.push({ text: 'Solidny', tone: 'good' });
-  else if (s.reliability < 30) out.push({ text: 'Ryzykant', tone: 'bad' });
-  if (s.stamina >= 80) out.push({ text: 'Żelazna kondycja', tone: 'good' });
-  else if (s.stamina < 30) out.push({ text: 'Śpioch', tone: 'bad' });
-  return out.slice(0, 3);
-}
+const stop = (fn: () => void) => (e: { stopPropagation(): void }) => {
+  e.stopPropagation();
+  fn();
+};
 
-function statColor(v: number) {
-  if (v >= 70) return 'var(--good)';
-  if (v >= 45) return 'var(--accent)';
-  return 'var(--bad)';
-}
-
-const wearColor = (w: number) => (w > 0.5 ? 'var(--bad)' : w > 0.3 ? 'var(--accent)' : 'var(--good)');
-
-function StatusBlock({ t, now, onFindJob, onService }: { t: TruckView; now: number; onFindJob: () => void; onService: () => void }) {
+function StatusBlock({ t, now, freeDrivers, a, onStaff }: { t: TruckView; now: number; freeDrivers: Snapshot['drivers']; a: FleetActions; onStaff: () => void }) {
   const { trip, truck } = t;
-  const stop = (fn: () => void) => (e: { stopPropagation(): void }) => {
-    e.stopPropagation();
-    fn();
-  };
 
   if (t.status === 'service') {
     return (
@@ -55,6 +41,35 @@ function StatusBlock({ t, now, onFindJob, onService }: { t: TruckView; now: numb
         <div className="fc-status-line">
           <strong>W serwisie</strong>
           <span className="muted">do {formatGameTime(t.serviceUntil!)}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (t.status === 'nodriver') {
+    return (
+      <div className="fc-status fc-idle">
+        <div className="fc-status-line">
+          <strong>Stoi bez kierowcy: {CITY_BY_ID[truck.cityId].name}</strong>
+        </div>
+        <div className="fc-idle-cost">Rata leasingu idzie dalej: {pln(truck.leasePerDay)}/dzień</div>
+        <div className="fc-actions" onClick={(e) => e.stopPropagation()}>
+          {freeDrivers.length > 0 ? (
+            <select defaultValue="" aria-label="Przypisz kierowcę" onChange={(e) => e.target.value && a.assign(truck.id, e.target.value)}>
+              <option value="" disabled>
+                Przypisz kierowcę…
+              </option>
+              {freeDrivers.map((d) => (
+                <option key={d.driver.id} value={d.driver.id}>
+                  {d.driver.nickname} · {pln(d.driver.salaryPerDay)}/dzień
+                </option>
+              ))}
+            </select>
+          ) : (
+            <button className="btn small primary" onClick={onStaff}>
+              Zatrudnij kierowcę
+            </button>
+          )}
         </div>
       </div>
     );
@@ -73,11 +88,11 @@ function StatusBlock({ t, now, onFindJob, onService }: { t: TruckView; now: numb
           Koszt postoju {pln(t.costPerHour)}/h{idleMin >= 60 && <>, dotąd ok. {pln(lost)}</>}
         </div>
         <div className="fc-actions">
-          <button className="btn small primary" onClick={stop(onFindJob)}>
+          <button className="btn small primary" onClick={stop(() => a.findJob(truck.id))}>
             Szukaj zlecenia
           </button>
           {truck.wear > 0.3 && (
-            <button className="btn small" onClick={stop(onService)} title={`Zużycie spadnie do ${pct(t.serviceQuote.wearAfter)}`}>
+            <button className="btn small" onClick={stop(() => a.service(truck.id))} title={`Zużycie spadnie do ${pct(t.serviceQuote.wearAfter)}`}>
               Serwis {pln(t.serviceQuote.cost)}
             </button>
           )}
@@ -124,52 +139,63 @@ function StatusBlock({ t, now, onFindJob, onService }: { t: TruckView; now: numb
   );
 }
 
-function Details({ t, now, onBonus }: { t: TruckView; now: number; onBonus: () => void }) {
+function Details({ t, now, a }: { t: TruckView; now: number; a: FleetActions }) {
   const { driver: d, truck } = t;
-  const bonusAt = d.lastBonusAt === undefined ? 0 : d.lastBonusAt + BALANCE.bonusCooldownDays * 24 * 60;
+  const bonusAt = d?.lastBonusAt === undefined ? 0 : d.lastBonusAt + BALANCE.bonusCooldownDays * 24 * 60;
+  const idle = !t.trip && t.status !== 'service';
   return (
     <div className="fc-details" onClick={(e) => e.stopPropagation()}>
-      <div className="fc-stats">
-        {Object.entries(d.stats).map(([k, v]) => (
-          <div className="fc-stat" key={k}>
-            <span className="fc-stat-name">{STAT_LABELS[k]}</span>
-            <span className="fc-stat-bar">
-              <span style={{ width: `${v}%`, background: statColor(v) }} />
+      {d && (
+        <>
+          <StatBars d={d} />
+          <div className="fc-morale">
+            <span className="muted">
+              Morale mnoży niezawodność: im niższe, tym częściej kierowca wpada na kontroli ITD. Rośnie przy terminowych kursach, spada przy
+              spóźnieniach i bezczynności, a z czasem wraca do normy.
             </span>
-            <span className="num fc-stat-val">{Math.round(v)}</span>
+            <button className="btn small" disabled={now < bonusAt} onClick={() => a.bonus(d.id)} title={now < bonusAt ? `Następna premia od ${formatGameTime(bonusAt)}` : undefined}>
+              {now < bonusAt ? `Premia od ${formatGameTime(bonusAt)}` : `Premia ${pln(BALANCE.bonusCost)} · morale +${BALANCE.bonusMorale}`}
+            </button>
           </div>
-        ))}
-      </div>
-      <div className="fc-morale">
-        <span className="muted">
-          Morale mnoży niezawodność: im niższe, tym częściej kierowca wpada na kontroli ITD. Rośnie przy terminowych kursach,
-          spada przy spóźnieniach i bezczynności, a z czasem wraca do normy.
-        </span>
-        <button className="btn small" disabled={now < bonusAt} onClick={onBonus} title={now < bonusAt ? `Następna premia od ${formatGameTime(bonusAt)}` : undefined}>
-          {now < bonusAt ? `Premia od ${formatGameTime(bonusAt)}` : `Premia ${pln(BALANCE.bonusCost)} · morale +${BALANCE.bonusMorale}`}
-        </button>
-      </div>
+        </>
+      )}
       <dl className="fc-facts">
-        <dt>Pensja</dt>
-        <dd className="num">{pln(d.salaryPerDay)}/dzień</dd>
-        <dt>Kursy</dt>
-        <dd className="num">
-          {d.jobsDone} ({d.lateJobs} spóźn.) · {km(d.kmDriven)}
-        </dd>
-        {!t.trip && (
+        {d && (
           <>
-            <dt>Tachograf</dt>
-            <dd className="num">{formatDuration(dutyAfterIdle(d.duty, now).today)} jazdy od odpoczynku</dd>
+            <dt>Pensja</dt>
+            <dd className="num">{pln(d.salaryPerDay)}/dzień</dd>
+            <dt>Kursy</dt>
+            <dd className="num">
+              {d.jobsDone} ({d.lateJobs} spóźn.) · {km(d.kmDriven)}
+            </dd>
+            {!t.trip && (
+              <>
+                <dt>Tachograf</dt>
+                <dd className="num">{formatDuration(dutyAfterIdle(d.duty, now).today)} jazdy od odpoczynku</dd>
+              </>
+            )}
           </>
         )}
         <dt>Auto</dt>
         <dd className="num">
-          Euro {truck.euro} · {km(truck.odometerKm)} · {truck.fuelL100} l/100
+          {truck.condition === 'new' ? 'Nowe · ' : ''}Euro {truck.euro} · {km(truck.odometerKm)} · {truck.fuelL100} l/100
         </dd>
         <dt>Leasing</dt>
         <dd className="num">{pln(truck.leasePerDay)}/dzień</dd>
       </dl>
-      <p className="quirk">{d.quirk}</p>
+      {d && <p className="quirk">{d.quirk}</p>}
+      {idle && (
+        <div className="fc-actions">
+          {d && (
+            <button className="btn small" onClick={() => a.assign(truck.id, null)} title="Kierowca zostaje w firmie bez auta">
+              Zdejmij kierowcę
+            </button>
+          )}
+          <button className="btn small danger" onClick={() => a.returnTruck(truck.id)} title="Kaucja przepada">
+            Zwróć auto (kara {pln(truck.leasePerDay * MARKETS.returnPenaltyDays)})
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -179,37 +205,45 @@ function TruckCard({
   now,
   selected,
   expanded,
-  onSelect,
+  freeDrivers,
+  a,
   onToggle,
-  onService,
-  onShowOnMap,
-  onFindJob,
-  onBonus,
+  onStaff,
 }: {
   t: TruckView;
   now: number;
   selected: boolean;
   expanded: boolean;
-  onSelect: () => void;
+  freeDrivers: Snapshot['drivers'];
+  a: FleetActions;
   onToggle: () => void;
-  onService: () => void;
-  onShowOnMap: () => void;
-  onFindJob: () => void;
-  onBonus: () => void;
+  onStaff: () => void;
 }) {
   const { truck, driver } = t;
-  const tr = traits(driver);
-  const cls = ['fleet-card', selected && 'selected', t.status === 'idle' && 'is-idle', t.status === 'incident' && 'is-incident'].filter(Boolean).join(' ');
+  const cls = [
+    'fleet-card',
+    selected && 'selected',
+    (t.status === 'idle' || t.status === 'nodriver') && 'is-idle',
+    t.status === 'incident' && 'is-incident',
+  ]
+    .filter(Boolean)
+    .join(' ');
   return (
-    <article className={cls} onClick={onSelect} data-status={t.status}>
+    <article className={cls} onClick={() => a.select(truck.id)} data-status={t.status}>
       <header className="fc-head">
         <span className="fc-no num" title="Numer zestawu (ten sam na mapie)">
           {t.fleetNo}
         </span>
         <div className="fc-who">
           <div className="fc-driver">
-            <strong>„{driver.nickname}”</strong>
-            {driver.firstName} {driver.lastName}
+            {driver ? (
+              <>
+                <strong>„{driver.nickname}”</strong>
+                {driver.firstName} {driver.lastName}
+              </>
+            ) : (
+              <strong className="muted">Brak kierowcy</strong>
+            )}
           </div>
           <div className="fc-truck">
             <span>
@@ -222,77 +256,46 @@ function TruckCard({
           </div>
         </div>
         {t.status === 'idle' && <span className="fc-pill">Wolny</span>}
+        {t.status === 'nodriver' && <span className="fc-pill">Bez kierowcy</span>}
       </header>
 
-      <StatusBlock t={t} now={now} onFindJob={onFindJob} onService={onService} />
+      <StatusBlock t={t} now={now} freeDrivers={freeDrivers} a={a} onStaff={onStaff} />
 
       <footer className="fc-foot">
-        <div className="fc-traits">
-          {tr.map((x) => (
-            <span key={x.text} className={`fc-trait ${x.tone}`} title={x.hint}>
-              {x.text}
-            </span>
-          ))}
-        </div>
-        <button
-          className="btn small mobile-only"
-          onClick={(e) => {
-            e.stopPropagation();
-            onShowOnMap();
-          }}
-        >
+        {driver ? <TraitChips d={driver} /> : <span style={{ flex: 1 }} />}
+        <button className="btn small mobile-only" onClick={stop(() => a.showOnMap(truck.id))}>
           Na mapie
         </button>
-        <button
-          className="btn small fc-more"
-          aria-expanded={expanded}
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle();
-          }}
-        >
+        <button className="btn small fc-more" aria-expanded={expanded} onClick={stop(onToggle)}>
           {expanded ? 'Zwiń' : 'Szczegóły'}
         </button>
       </footer>
 
-      {expanded && <Details t={t} now={now} onBonus={onBonus} />}
+      {expanded && <Details t={t} now={now} a={a} />}
     </article>
   );
 }
 
-/** Wolni najpierw (najdłużej stojący na górze), potem zdarzenia, potem wg ETA, serwis na końcu. */
+/** Wolni i bez kierowcy najpierw (najdłużej stojący na górze), potem zdarzenia, potem wg ETA, serwis na końcu. */
 function order(t: TruckView): number {
+  if (t.status === 'nodriver') return -2e9;
   if (t.status === 'idle') return -1e9 + (t.idleSince ?? 0);
   if (t.status === 'incident') return -1e8;
   if (t.status === 'service') return 1e12;
   return t.trip?.eta ?? 0;
 }
 
-export function FleetPanel({
-  snap,
-  selectedId,
-  onSelect,
-  onLease,
-  onService,
-  onShowOnMap,
-  onFindJob,
-  onBonus,
-}: {
-  snap: Snapshot;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  onLease: () => void;
-  onService: (truckId: string) => void;
-  onShowOnMap: (truckId: string) => void;
-  onFindJob: (truckId: string) => void;
-  onBonus: (driverId: string) => void;
-}) {
+type View = 'trucks' | 'drivers' | 'hire' | 'showroom';
+
+export function FleetPanel({ snap, selectedId, a }: { snap: Snapshot; selectedId: string | null; a: FleetActions }) {
+  const [view, setView] = useState<View>('trucks');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const leaseCost = BALANCE.hireFee + BALANCE.leaseDeposit;
-  const fleet = [...snap.fleet].sort((a, b) => order(a) - order(b));
-  const idle = snap.fleet.filter((t) => t.status === 'idle').length;
+  const fleet = [...snap.fleet].sort((x, y) => order(x) - order(y));
+  const idle = snap.fleet.filter((t) => t.status === 'idle' || t.status === 'nodriver').length;
   const service = snap.fleet.filter((t) => t.status === 'service').length;
   const moving = snap.fleet.length - idle - service;
+  const freeDrivers = snap.drivers.filter((d) => !d.truckId);
+  const { fleetCap, driverCap } = snap.company;
   const toggle = (id: string) =>
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -301,36 +304,48 @@ export function FleetPanel({
       return next;
     });
 
+  const tabs: { id: View; label: string; count?: string }[] = [
+    { id: 'trucks', label: 'Zestawy', count: `${snap.fleet.length}/${fleetCap}` },
+    { id: 'drivers', label: 'Kierowcy', count: `${snap.drivers.length}/${driverCap}` },
+    { id: 'hire', label: 'Rynek pracy', count: String(snap.candidates.length) },
+    { id: 'showroom', label: 'Salon', count: String(snap.truckOffers.length) },
+  ];
+
   return (
     <section className="panel area-fleet">
       <div className="panel-head">
         <span className="panel-title">Flota</span>
         <span className="fleet-summary">
-          {idle > 0 && <span className="fs-idle">{idle} wolne</span>}
+          {idle > 0 && <span className="fs-idle">{idle} stoi</span>}
           <span>{moving} w trasie</span>
           {service > 0 && <span>{service} w serwisie</span>}
         </span>
-        <span className="spacer" />
-        <button className="btn small" onClick={onLease} disabled={snap.cash < leaseCost} title="Kaucja leasingowa + rekrutacja kierowcy">
-          + Zestaw ({pln(leaseCost)})
-        </button>
+      </div>
+      <div className="subtabs" role="tablist" aria-label="Widok floty">
+        {tabs.map((t) => (
+          <button key={t.id} role="tab" aria-selected={view === t.id} className={view === t.id ? 'on' : ''} onClick={() => setView(t.id)}>
+            {t.label} <span className="num muted">{t.count}</span>
+          </button>
+        ))}
       </div>
       <div className="panel-body scroll fleet-list">
-        {fleet.map((t) => (
-          <TruckCard
-            key={t.truck.id}
-            t={t}
-            now={snap.now}
-            selected={t.truck.id === selectedId}
-            expanded={expanded.has(t.truck.id)}
-            onSelect={() => onSelect(t.truck.id)}
-            onToggle={() => toggle(t.truck.id)}
-            onService={() => onService(t.truck.id)}
-            onShowOnMap={() => onShowOnMap(t.truck.id)}
-            onFindJob={() => onFindJob(t.truck.id)}
-            onBonus={() => onBonus(t.driver.id)}
-          />
-        ))}
+        {view === 'trucks' &&
+          fleet.map((t) => (
+            <TruckCard
+              key={t.truck.id}
+              t={t}
+              now={snap.now}
+              selected={t.truck.id === selectedId}
+              expanded={expanded.has(t.truck.id)}
+              freeDrivers={freeDrivers}
+              a={a}
+              onToggle={() => toggle(t.truck.id)}
+              onStaff={() => setView('hire')}
+            />
+          ))}
+        {view === 'drivers' && <DriversList snap={snap} a={a} onHire={() => setView('hire')} />}
+        {view === 'hire' && <CandidatesList snap={snap} a={a} />}
+        {view === 'showroom' && <Showroom snap={snap} a={a} />}
       </div>
     </section>
   );

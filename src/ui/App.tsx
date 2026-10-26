@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { CatchUpReport } from '../engine/sim';
 import { SPEED_PRESETS, formatDuration, formatGameTime } from '../engine/time';
 import { CashChart, CostBreakdown } from './components/Charts';
+import { CompanyPanel } from './components/CompanyPanel';
 import { FleetPanel } from './components/FleetPanel';
 import { LogPanel } from './components/LogPanel';
 import { MapPanel } from './components/MapPanel';
@@ -71,7 +72,7 @@ export function App() {
   const freeIds = new Set(snap.fleet.filter((t) => t.status === 'idle').map((t) => t.truck.id));
   const badges = {
     market: snap.market.filter((j) => j.previews.some((p) => freeIds.has(p.truckId) && p.onTime && !p.tooFar)).length,
-    fleet: freeIds.size,
+    fleet: snap.fleet.filter((t) => t.status === 'idle' || t.status === 'nodriver').length,
     log: snap.log.filter((e) => e.t > logSeenAt && e.tone !== 'info').length,
   };
 
@@ -146,6 +147,11 @@ export function App() {
             <div className="sub">{snap.totals.lateJobs} spóźnionych</div>
           </div>
           <div className="kpi">
+            <div className="label">Ranga</div>
+            <div className="value kpi-rank">{snap.company.rankName}</div>
+            <div className="sub">reputacja {snap.company.reputation}</div>
+          </div>
+          <div className="kpi">
             <div className="label">Przebieg</div>
             <div className="value">{km(snap.totals.km)}</div>
             <div className="sub">łącznie flota</div>
@@ -178,19 +184,31 @@ export function App() {
         <FleetPanel
           snap={snap}
           selectedId={selectedId}
-          onSelect={(id) => {
-            setSelected(id);
-            // Na komputerze mapa jest obok, więc od razu pokazujemy na niej zestaw.
-            if (!mobile) setFocus({ kind: 'truck', id, n: (focus?.n ?? 0) + 1 });
+          a={{
+            select: (id) => {
+              setSelected(id);
+              // Na komputerze mapa jest obok, więc od razu pokazujemy na niej zestaw.
+              if (!mobile) setFocus({ kind: 'truck', id, n: (focus?.n ?? 0) + 1 });
+            },
+            findJob: (id) => {
+              setSelected(id);
+              if (mobile) switchTab('market');
+            },
+            showOnMap: showTruckOnMap,
+            service: (id) => run(sim.serviceTruck(id)),
+            bonus: (id) => run(sim.giveBonus(id)),
+            hire: (id) => run(sim.hireDriver(id)),
+            fire: (id) => run(sim.fireDriver(id)),
+            assign: (truckId, driverId) => run(sim.assignDriver(truckId, driverId)),
+            lease: (id) => run(sim.leaseOffer(id)),
+            returnTruck: (id) => run(sim.returnTruck(id)),
           }}
-          onBonus={(id) => run(sim.giveBonus(id))}
-          onFindJob={(id) => {
-            setSelected(id);
-            if (mobile) switchTab('market');
-          }}
-          onLease={() => run(sim.leaseTruck())}
-          onService={(id) => run(sim.serviceTruck(id))}
-          onShowOnMap={showTruckOnMap}
+        />
+        <CompanyPanel
+          snap={snap}
+          onYard={() => run(sim.upgradeYard())}
+          onUpgrade={(id) => run(sim.buyUpgrade(id))}
+          onAutoDispatch={(on) => run(sim.setAutoDispatch(on))}
         />
         <CashChart snap={snap} />
         <CostBreakdown snap={snap} />

@@ -1,5 +1,6 @@
 import type { CatchUpReport, ActionResult } from '../engine/sim';
 import type { Snapshot } from '../engine/view';
+import type { UpgradeId } from '../data/progression';
 
 /** Kontrakt między UI a workerem symulacji. Typowany, bez bibliotek. */
 export interface SimApi {
@@ -7,9 +8,16 @@ export interface SimApi {
   setPace(pace: number): void;
   setHidden(hidden: boolean): void;
   acceptJob(jobId: string, truckId: string): ActionResult;
-  leaseTruck(): ActionResult;
   serviceTruck(truckId: string): ActionResult;
   giveBonus(driverId: string): ActionResult;
+  hireDriver(candidateId: string): ActionResult;
+  fireDriver(driverId: string): ActionResult;
+  assignDriver(truckId: string, driverId: string | null): ActionResult;
+  leaseOffer(offerId: string): ActionResult;
+  returnTruck(truckId: string): ActionResult;
+  upgradeYard(): ActionResult;
+  buyUpgrade(id: UpgradeId): ActionResult;
+  setAutoDispatch(on: boolean): ActionResult;
   newGame(seed?: number): void;
   save(): Promise<boolean>;
 }

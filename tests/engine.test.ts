@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { dutyAfterIdle, planTrip, RULES } from '../src/engine/drivingRules';
 import { createQueue, qPop, qPush } from '../src/engine/queue';
-import { acceptJob, advanceTo, catchUp, isAvailable, leaseTruck, newGame, previewJob } from '../src/engine/sim';
+import { acceptJob, advanceTo, catchUp, newGame, previewJob } from '../src/engine/sim';
+import { botTick } from '../tools/bot';
 import { roadKm } from '../src/engine/routes';
 import { BALANCE } from '../src/data/balance';
 import type { GameState } from '../src/engine/types';
@@ -67,14 +68,7 @@ function playScript(seed: number): GameState {
   const s = newGame(seed);
   for (let h = 0; h < 24 * 30; h++) {
     advanceTo(s, s.now + 60);
-    for (const t of s.trucks.filter(isAvailable)) {
-      const best = s.market
-        .map((j) => ({ j, p: previewJob(s, j, t) }))
-        .filter((x) => x.p.onTime && !x.p.tooFar)
-        .sort((a, b) => b.p.profit / b.p.durationMin - a.p.profit / a.p.durationMin)[0];
-      if (best) acceptJob(s, best.j.id, t.id);
-    }
-    if (s.cash > 80_000 && s.trucks.length < 4) leaseTruck(s);
+    botTick(s);
   }
   return s;
 }
@@ -184,5 +178,75 @@ describe('giełda', () => {
     truck.cityId = job.toId;
     s.drivers[0].duty = { sinceBreak: 0, today: 0, at: s.now - 24 * 60 };
     expect(local.every((j) => previewJob(s, j, truck).onTime)).toBe(true);
+  });
+});
+
+describe('progresja i rynek', () => {
+  it('kierowcy i auta są osobno: zwolnienie zostawia auto bez kierowcy, zatrudnienie je obsadza', async () => {
+    const E = await import('../src/engine/sim');
+    const s = newGame(31);
+    const t = s.trucks[0];
+    const d = s.drivers[0];
+    expect(E.fireDriver(s, d.id).ok).toBe(true);
+    expect(t.driverId).toBeNull();
+    expect(E.isAvailable(t)).toBe(false);
+    expect(E.acceptJob(s, s.market[0].id, t.id).ok).toBe(false);
+    const c = s.candidates[0];
+    expect(E.hireDriver(s, c.id).ok).toBe(true);
+    expect(t.driverId).not.toBeNull();
+    expect(E.isAvailable(t)).toBe(true);
+  });
+
+  it('limit placu blokuje leasing, rozbudowa wymaga rangi', async () => {
+    const E = await import('../src/engine/sim');
+    const s = newGame(32);
+    s.cash = 1_000_000;
+    while (s.trucks.length < E.fleetCap(s)) expect(E.leaseOffer(s, s.truckOffers[0].id).ok).toBe(true);
+    expect(E.leaseOffer(s, s.truckOffers[0].id).ok).toBe(false);
+    expect(E.upgradeYard(s).ok).toBe(false); // ranga 0
+    s.reputation = 30;
+    expect(E.upgradeYard(s).ok).toBe(true);
+    expect(E.leaseOffer(s, s.truckOffers[0].id).ok).toBe(true);
+  });
+
+  it('dyspozytorka sama wysyła wolne zestawy w trasę', async () => {
+    const E = await import('../src/engine/sim');
+    const s = newGame(33);
+    s.cash = 1_000_000;
+    s.reputation = 450;
+    expect(E.buyUpgrade(s, 'dispatcher').ok).toBe(true);
+    advanceTo(s, s.now + 60);
+    expect(s.trucks[0].tripId).not.toBeNull();
+  });
+
+  it('awans po terminowych kursach, spadek po spóźnieniu', async () => {
+    const E = await import('../src/engine/sim');
+    const s = newGame(34);
+    E.addReputation(s, 29);
+    expect(E.rankIndex(s.reputation)).toBe(0);
+    E.addReputation(s, 1);
+    expect(E.rankIndex(s.reputation)).toBe(1);
+    expect(s.log.at(-1)!.text).toContain('Awans');
+  });
+
+  it('zapis z wersji 1 migruje się z reputacją z historii i placem mieszczącym flotę', async () => {
+    const { migrate } = await import('../src/engine/save');
+    const s = newGame(35);
+    const old: any = JSON.parse(JSON.stringify(s));
+    old.version = 1;
+    delete old.reputation;
+    delete old.base;
+    delete old.candidates;
+    delete old.truckOffers;
+    old.totals.jobsDone = 50;
+    old.totals.lateJobs = 5;
+    old.trucks = [old.trucks[0], { ...old.trucks[0], id: 'tX' }, { ...old.trucks[0], id: 'tY' }, { ...old.trucks[0], id: 'tZ' }];
+    const m = migrate(old)!;
+    expect(m.version).toBe(2);
+    expect(m.reputation).toBe(30);
+    expect(m.base.yard).toBe(1); // 4 auta nie mieszczą się na placu na 3
+    advanceTo(m, m.now + 1);
+    expect(m.candidates.length).toBeGreaterThan(0);
+    expect(m.truckOffers.length).toBeGreaterThan(0);
   });
 });

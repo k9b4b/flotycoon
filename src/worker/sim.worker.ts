@@ -3,7 +3,8 @@
  * UI nigdy nie modyfikuje stanu bezpośrednio, tylko woła metody SimApi.
  */
 import { migrate } from '../engine/save';
-import { acceptJob, advanceTo, catchUp, giveBonus, leaseTruck, log, newGame, serviceTruck, type CatchUpReport } from '../engine/sim';
+import * as E from '../engine/sim';
+import { advanceTo, catchUp, log, newGame, type ActionResult, type CatchUpReport } from '../engine/sim';
 import { BASE_PACE, formatDuration } from '../engine/time';
 import type { GameState } from '../engine/types';
 import { buildSnapshot } from '../engine/view';
@@ -49,6 +50,12 @@ function tick() {
   if (Date.now() - lastSave > AUTOSAVE_MS) void persist();
 }
 
+function act(fn: () => ActionResult): ActionResult {
+  const r = fn();
+  pushSnapshot();
+  return r;
+}
+
 const api: SimApi = {
   async init() {
     const rec = await loadSave(SLOT);
@@ -79,26 +86,18 @@ const api: SimApi = {
     hidden = h;
     if (h) void persist();
   },
-  acceptJob(jobId, truckId) {
-    const r = acceptJob(state!, jobId, truckId);
-    pushSnapshot();
-    return r;
-  },
-  leaseTruck() {
-    const r = leaseTruck(state!);
-    pushSnapshot();
-    return r;
-  },
-  giveBonus(driverId) {
-    const r = giveBonus(state!, driverId);
-    pushSnapshot();
-    return r;
-  },
-  serviceTruck(truckId) {
-    const r = serviceTruck(state!, truckId);
-    pushSnapshot();
-    return r;
-  },
+  // Każda akcja gracza: wykonaj na stanie i od razu odśwież widok.
+  acceptJob: (jobId, truckId) => act(() => E.acceptJob(state!, jobId, truckId)),
+  serviceTruck: (truckId) => act(() => E.serviceTruck(state!, truckId)),
+  giveBonus: (driverId) => act(() => E.giveBonus(state!, driverId)),
+  hireDriver: (id) => act(() => E.hireDriver(state!, id)),
+  fireDriver: (id) => act(() => E.fireDriver(state!, id)),
+  assignDriver: (truckId, driverId) => act(() => E.assignDriver(state!, truckId, driverId)),
+  leaseOffer: (id) => act(() => E.leaseOffer(state!, id)),
+  returnTruck: (id) => act(() => E.returnTruck(state!, id)),
+  upgradeYard: () => act(() => E.upgradeYard(state!)),
+  buyUpgrade: (id) => act(() => E.buyUpgrade(state!, id)),
+  setAutoDispatch: (on) => act(() => E.setAutoDispatch(state!, on)),
   newGame(seed) {
     state = newGame(seed ?? ((Math.random() * 2 ** 31) | 0));
     void persist();

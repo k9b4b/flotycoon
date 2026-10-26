@@ -2,7 +2,7 @@ import type { DutyState } from './drivingRules';
 import type { Queue } from './queue';
 import type { RngState } from './rng';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 /** Wszystkie statystyki 0–100. Każda na coś wpływa (patrz engine/effects.ts). */
 export interface DriverStats {
@@ -43,11 +43,32 @@ export interface Truck {
   wear: number; // 0–1, wpływa na awarie i spalanie
   leasePerDay: number;
   cityId: string;
-  /** Na razie zestaw = ciągnik + przypisany kierowca. */
-  driverId: string;
+  /** Przypisany kierowca; null = auto stoi bez kierowcy. */
+  driverId: string | null;
   tripId: string | null;
   /** Serwis do tej chwili (czas gry) albo null. */
   serviceUntil: number | null;
+  /** Kaucja leasingowa wpłacona przy odbiorze (przepada przy wcześniejszym zwrocie). */
+  deposit?: number;
+  condition?: TruckCondition;
+}
+
+export type TruckCondition = 'new' | 'used';
+
+/** Oferta z salonu: auto jeszcze bez lokalizacji i kierowcy. */
+export type TruckOffer = Omit<Truck, 'cityId' | 'driverId' | 'tripId' | 'serviceUntil'> & {
+  deposit: number;
+  condition: TruckCondition;
+};
+
+export interface BaseState {
+  /** Poziom placu (indeks w YARD). */
+  yard: number;
+  workshop: boolean;
+  office: boolean;
+  dispatcher: boolean;
+  /** Dyspozytor może być zatrudniony, ale wstrzymany przez gracza. */
+  autoDispatch: boolean;
 }
 
 export interface Job {
@@ -109,7 +130,7 @@ export interface LogEntry {
   text: string;
 }
 
-export type CostCategory = 'fuel' | 'toll' | 'salaries' | 'lease' | 'repairs' | 'fines' | 'fleet' | 'bonuses';
+export type CostCategory = 'fuel' | 'toll' | 'salaries' | 'lease' | 'repairs' | 'fines' | 'fleet' | 'bonuses' | 'base';
 
 export interface DayRecord {
   day: number;
@@ -123,7 +144,10 @@ export type GameEvent =
   | { type: 'TRIP_INCIDENT'; tripId: string; phaseIdx: number }
   | { type: 'SERVICE_DONE'; truckId: string }
   | { type: 'MARKET_REFRESH' }
-  | { type: 'DAILY' };
+  | { type: 'DAILY' }
+  | { type: 'CANDIDATES_REFRESH' }
+  | { type: 'OFFERS_REFRESH' }
+  | { type: 'DISPATCH' };
 
 export interface GameState {
   version: number;
@@ -143,4 +167,10 @@ export interface GameState {
   totals: { revenue: number; costs: number; jobsDone: number; km: number; lateJobs: number; penalties: number };
   costsByCategory: Record<CostCategory, number>;
   nextId: number;
+  reputation: number;
+  base: BaseState;
+  /** Kandydaci na kierowców (rynek pracy). */
+  candidates: Driver[];
+  /** Oferty salonu (leasing). */
+  truckOffers: TruckOffer[];
 }

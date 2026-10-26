@@ -53,6 +53,7 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
     'kpis   kpis   kpis'
     'map    market market'
     'map    fleet  fleet'
+    'growth growth growth'
     'cash   costs  log';
 }
 .area-kpis { grid-area: kpis; }
@@ -62,15 +63,16 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
 .area-cash { grid-area: cash; }
 .area-costs { grid-area: costs; }
 .area-log { grid-area: log; }
+.area-growth { grid-area: growth; }
 
 @media (max-width: 1100px) {
   .grid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas: 'kpis kpis' 'map map' 'market fleet' 'cash costs' 'log log';
+    grid-template-areas: 'kpis kpis' 'map map' 'market fleet' 'growth growth' 'cash costs' 'log log';
   }
 }
 @media (max-width: 720px) {
-  .grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'kpis' 'map' 'fleet' 'market' 'cash' 'costs' 'log'; padding-block: 8px 24px; }
+  .grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'kpis' 'map' 'fleet' 'market' 'growth' 'cash' 'costs' 'log'; padding-block: 8px 24px; }
 }
 
 .panel {
@@ -153,7 +155,7 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
 }
 
 /* ── KPI ───────────────────────────────────────────── */
-.kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+.kpis { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 1100px) { .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; }
@@ -432,6 +434,7 @@ select {
   .grid[data-tab='fleet'] > .area-fleet,
   .grid[data-tab='log'] > .area-log { display: flex; }
   .grid[data-tab='company'] > .area-kpis { display: grid; }
+  .grid[data-tab='company'] > .area-growth,
   .grid[data-tab='company'] > .area-cash,
   .grid[data-tab='company'] > .area-costs { display: flex; }
   .grid[data-tab] .scroll { max-height: none; overflow: visible; }
@@ -495,3 +498,49 @@ select {
   .panel-head { flex-wrap: wrap; row-gap: 8px; }
   .panel-head select { flex: 1 1 100%; }
 }
+
+/* ── Podzakładki floty, kadry, salon ───────────────── */
+.subtabs { display: flex; gap: 4px; padding: 8px 10px 0; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.subtabs button {
+  border: 0;
+  background: none;
+  padding: 8px 10px 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.subtabs button.on { color: var(--text); border-bottom-color: var(--accent); }
+.subtabs .num { font-size: 11px; margin-left: 2px; }
+.staff-note { font-size: 12px; margin: 0; }
+.staff-card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.staff-card.is-free { border-left: 4px solid var(--accent); }
+.staff-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.staff-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.staff-specs { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.btn.locked { border-style: dashed; color: var(--muted); background: none; }
+.btn.locked:disabled { opacity: 0.8; }
+.btn.danger { color: var(--bad); }
+.btn.danger:hover:not(:disabled) { border-color: var(--bad); }
+.kpi-rank { font-family: var(--font-cond) !important; font-size: 17px !important; white-space: normal !important; line-height: 1.15; }
+
+/* ── Rozwój firmy ──────────────────────────────────── */
+.growth { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(0, 2.4fr); gap: 16px; align-items: start; }
+@media (max-width: 1100px) { .growth { grid-template-columns: minmax(0, 1fr); } }
+.rank { display: flex; flex-direction: column; gap: 6px; }
+.rank-label { font-family: var(--font-cond); text-transform: uppercase; letter-spacing: 0.08em; font-size: 12px; color: var(--muted); }
+.rank-name { font-family: var(--font-cond); font-weight: 700; font-size: 26px; line-height: 1.05; color: var(--accent); text-wrap: balance; }
+.rank-bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+.rank-bar > span { display: block; height: 100%; background: var(--accent); }
+.rank-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; flex-wrap: wrap; }
+.rank-perk { font-size: 12px; margin: 0; }
+.growth-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.up-card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.up-card.owned { border-color: rgba(62, 207, 142, 0.4); }
+.up-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.up-desc { font-size: 12px; flex: 1; }
+.up-card .btn { align-self: flex-start; white-space: normal; text-align: left; }
+.switch { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.switch input { width: 18px; height: 18px; accent-color: var(--accent); }

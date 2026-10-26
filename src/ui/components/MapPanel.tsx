@@ -69,7 +69,7 @@ function TripTimeline({ t, now }: { t?: TruckView; now: number }) {
   if (!t) return null;
   const head = (
     <div className="panel-title" style={{ marginBottom: 8 }}>
-      Plan kursu · {t.driver.nickname}
+      Plan kursu · #{t.fleetNo} {t.driver?.nickname ?? 'bez kierowcy'}
     </div>
   );
   if (!t.trip) {
@@ -159,7 +159,7 @@ function PreviewCard({
       </div>
       {job && p && truck ? (
         <div className="truck-row" style={{ fontSize: 12 }}>
-          <span className="muted">{truck.driver.nickname}</span>
+          <span className="muted">{truck.driver?.nickname}</span>
           {p.emptyKm > 0 && <span className="muted">dojazd {km(p.emptyKm)}</span>}
           <span className="muted">ETA {formatGameTime(p.eta)}</span>
                     {p.restMin > 0 && (

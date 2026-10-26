@@ -1,98 +1,40 @@
 import { BALANCE } from '../data/balance';
 import { CITIES, CITY_BY_ID, HOME_BASE } from '../data/cities';
-import { CARGO, CLIENTS, COMPANY_START, DAILY_FLAVOR, FEMALE_NAMES, LAST_NAMES, MALE_NAMES, NICKNAMES, QUIRKS, TRUCK_MODELS } from '../data/flavor';
-import { FRESH_DUTY, planTrip, type Leg } from './drivingRules';
+import { CARGO, CLIENTS, COMPANY_START, DAILY_FLAVOR } from '../data/flavor';
+import { MARKETS, OFFICE, REPUTATION } from '../data/progression';
+import {
+  addReputation,
+  driverOfTruck,
+  generateDriver,
+  refreshCandidates,
+  refreshTruckOffers,
+  serviceModifiers,
+  truckFromOffer,
+  truckOfDriver,
+  upgradesPerDay,
+  usedOffer,
+} from './company';
+import { driverName, earn, fmtPLN, g, log, newId, spend, type ActionResult } from './core';
+import { planTrip, type Leg } from './drivingRules';
 import { clamp, driverSpeedKmh, rollIncidents, tripCosts } from './effects';
 import { createQueue, qPeek, qPop, qPush } from './queue';
-import { chance, createRng, pick, pickWeighted, rand, randInt, randRange, type RngState } from './rng';
+import { chance, createRng, pick, pickWeighted, rand, randInt, randRange } from './rng';
 import { roadKm } from './routes';
 import { MIN_PER_HOUR, dayIndex, formatDuration, formatGameTime, nextMidnight } from './time';
-import { SAVE_VERSION, type CostCategory, type Driver, type GameEvent, type GameState, type Job, type LogTone, type Trip, type Truck } from './types';
+import { SAVE_VERSION, type Driver, type GameEvent, type GameState, type Job, type Trip, type Truck } from './types';
 
-// ─── Pomocnicze ──────────────────────────────────────────────────────────────
+// Ponowny eksport, żeby UI, worker i narzędzia miały jedno miejsce importu.
+export { driverName, fmtPLN, g, log, type ActionResult };
+export * from './company';
 
-export const fmtPLN = (v: number) => `${Math.round(v).toLocaleString('pl-PL')} zł`;
+// ─── Dostępność ──────────────────────────────────────────────────────────────
 
-function newId(s: GameState, prefix: string): string {
-  return `${prefix}${s.nextId++}`;
-}
+/** Auto stoi na placu: nie jest w trasie ani w serwisie. */
+export const isIdle = (t: Truck) => !t.tripId && t.serviceUntil === null;
+/** Auto może wziąć zlecenie: stoi i ma kierowcę. */
+export const isAvailable = (t: Truck) => isIdle(t) && t.driverId !== null;
 
-export function log(s: GameState, tone: LogTone, text: string): void {
-  s.log.push({ t: s.now, tone, text });
-  if (s.log.length > 400) s.log.splice(0, s.log.length - 400);
-}
-
-function earn(s: GameState, amount: number) {
-  s.cash += amount;
-  s.today.revenue += amount;
-  s.totals.revenue += amount;
-}
-
-function spend(s: GameState, amount: number, cat: CostCategory) {
-  s.costsByCategory[cat] += amount;
-  s.cash -= amount;
-  s.today.costs += amount;
-  s.totals.costs += amount;
-}
-
-/** Końcówka czasownika w czasie przeszłym: g(d) → '' lub 'a'. */
-export const g = (d: Driver) => (d.female ? 'a' : '');
-
-export const driverName = (d: Driver) => `${d.firstName} „${d.nickname}” ${d.lastName}`;
-
-// ─── Generatory ──────────────────────────────────────────────────────────────
-
-function randomPlate(r: RngState): string {
-  const letters = 'ABCDEFGHJKLMNPRSTUWXYZ';
-  const l = () => letters[Math.floor(rand(r) * letters.length)];
-  return `WX ${randInt(r, 10, 99)}${l()}${l()}${randInt(r, 1, 9)}`;
-}
-
-export function generateDriver(s: GameState): Driver {
-  const r = s.rng;
-  const female = chance(r, 0.18);
-  let last = pick(r, LAST_NAMES);
-  if (female) last = last.replace(/ski$/, 'ska').replace(/cki$/, 'cka');
-  const stat = () => randInt(r, 25, 85);
-  const stats = { experience: stat(), eco: stat(), reliability: stat(), stamina: stat(), morale: randInt(r, 55, 80) };
-  return {
-    id: newId(s, 'd'),
-    firstName: pick(r, female ? FEMALE_NAMES : MALE_NAMES),
-    lastName: last,
-    female,
-    nickname: pick(r, NICKNAMES),
-    quirk: pick(r, QUIRKS),
-    stats,
-    salaryPerDay: Math.round(330 + stats.experience * 2 + randInt(r, 0, 50)),
-    hiredAt: s.now,
-    kmDriven: 0,
-    jobsDone: 0,
-    lateJobs: 0,
-    duty: FRESH_DUTY(s.now - 24 * 60),
-  };
-}
-
-export function generateTruck(s: GameState, driverId: string, cityId: string): Truck {
-  const r = s.rng;
-  const m = pick(r, TRUCK_MODELS);
-  const odometerKm = randInt(r, 25, 85) * 10_000;
-  const euro: 5 | 6 = chance(r, 0.2) ? 5 : 6;
-  return {
-    id: newId(s, 't'),
-    plate: randomPlate(r),
-    brand: m.brand,
-    model: m.model,
-    euro,
-    fuelL100: Math.round((m.fuelL100 + randRange(r, -1, 1.5)) * 10) / 10,
-    odometerKm,
-    wear: clamp(odometerKm / 1_400_000 + randRange(r, 0, 0.1), 0, 0.95),
-    leasePerDay: Math.round((euro === 5 ? 170 : 215) + (850_000 - odometerKm) / 12_000 + randInt(r, 0, 30)),
-    cityId,
-    driverId,
-    tripId: null,
-    serviceUntil: null,
-  };
-}
+// ─── Giełda ──────────────────────────────────────────────────────────────────
 
 /**
  * Skąd biorą się ładunki: giełda pokazuje głównie okolice naszych aut, tak jak
@@ -153,9 +95,11 @@ export function generateJob(s: GameState, forcedFrom?: string): Job {
   };
 }
 
+const marketSize = (s: GameState) => BALANCE.marketSize + (s.base.office ? OFFICE.extraOffers : 0);
+
 function refillMarket(s: GameState) {
   s.market = s.market.filter((j) => j.expiresAt > s.now);
-  while (s.market.length < BALANCE.marketSize) s.market.push(generateJob(s));
+  while (s.market.length < marketSize(s)) s.market.push(generateJob(s));
 }
 
 // ─── Nowa gra ────────────────────────────────────────────────────────────────
@@ -177,18 +121,24 @@ export function newGame(seed: number): GameState {
     days: [],
     today: { revenue: 0, costs: 0 },
     totals: { revenue: 0, costs: 0, jobsDone: 0, km: 0, lateJobs: 0, penalties: 0 },
-    costsByCategory: { fuel: 0, toll: 0, salaries: 0, lease: 0, repairs: 0, fines: 0, fleet: 0, bonuses: 0 },
+    costsByCategory: { fuel: 0, toll: 0, salaries: 0, lease: 0, repairs: 0, fines: 0, fleet: 0, bonuses: 0, base: 0 },
     nextId: 1,
+    reputation: 0,
+    base: { yard: 0, workshop: false, office: false, dispatcher: false, autoDispatch: false },
+    candidates: [],
+    truckOffers: [],
   };
   const d = generateDriver(s);
   // Pierwszy kierowca jest trochę lepszy, żeby start nie był karą.
   d.stats.reliability = Math.max(d.stats.reliability, 60);
   d.stats.stamina = Math.max(d.stats.stamina, 55);
   s.drivers.push(d);
-  const first = generateTruck(s, d.id, HOME_BASE);
+  const first = truckFromOffer({ ...usedOffer(s), id: newId(s, 't') }, HOME_BASE, d.id);
   first.wear = Math.min(first.wear, 0.3);
   s.trucks.push(first);
   refillMarket(s);
+  refreshCandidates(s);
+  refreshTruckOffers(s);
   for (const line of COMPANY_START) log(s, 'funny', line.replace('{company}', s.companyName).replace('{cash}', fmtPLN(s.cash)));
   log(s, 'info', `Zatrudniono: ${driverName(d)}. ${d.quirk}`);
   qPush(s.queue, nextMidnight(s.now), { type: 'DAILY' });
@@ -196,7 +146,7 @@ export function newGame(seed: number): GameState {
   return s;
 }
 
-// ─── Akcje gracza ────────────────────────────────────────────────────────────
+// ─── Akcje gracza: zlecenia i serwis ─────────────────────────────────────────
 
 export interface JobPreview {
   truckId: string;
@@ -223,9 +173,10 @@ function legsFor(job: Job, emptyKm: number): Leg[] {
   return legs;
 }
 
-/** Podgląd kursu bez losowych zdarzeń. Nie zużywa RNG, więc można go liczyć ile się chce. */
+/** Podgląd kursu bez losowych zdarzeń. Nie zużywa RNG. Wymaga auta z kierowcą. */
 export function previewJob(s: GameState, job: Job, truck: Truck): JobPreview {
-  const driver = s.drivers.find((d) => d.id === truck.driverId)!;
+  const driver = driverOfTruck(s, truck);
+  if (!driver) throw new Error(`Auto ${truck.id} nie ma kierowcy`);
   const emptyKm = roadKm(truck.cityId, job.fromId);
   const { phases } = planTrip(s.now, legsFor(job, emptyKm), driverSpeedKmh(driver), [], driver.duty);
   const eta = phases[phases.length - 1].end;
@@ -246,8 +197,6 @@ export function previewJob(s: GameState, job: Job, truck: Truck): JobPreview {
   };
 }
 
-export type ActionResult = { ok: true; message: string } | { ok: false; error: string };
-
 export function acceptJob(s: GameState, jobId: string, truckId: string): ActionResult {
   const job = s.market.find((j) => j.id === jobId);
   if (!job || job.expiresAt <= s.now) return { ok: false, error: 'Zlecenie już nieaktualne. Ktoś był szybszy.' };
@@ -255,7 +204,8 @@ export function acceptJob(s: GameState, jobId: string, truckId: string): ActionR
   if (!truck) return { ok: false, error: 'Nie ma takiego ciągnika.' };
   if (truck.tripId) return { ok: false, error: 'Ten zestaw jest w trasie.' };
   if (truck.serviceUntil !== null) return { ok: false, error: 'Ciągnik stoi w serwisie. Mechanik mówi „jeszcze chwilka”.' };
-  const driver = s.drivers.find((d) => d.id === truck.driverId)!;
+  const driver = driverOfTruck(s, truck);
+  if (!driver) return { ok: false, error: 'To auto nie ma kierowcy. Samo nie pojedzie (jeszcze).' };
   const emptyKm = roadKm(truck.cityId, job.fromId);
   if (emptyKm > BALANCE.maxEmptyRunKm) return { ok: false, error: `Dojazd na pusto ${emptyKm} km. Księgowa zemdlała.` };
 
@@ -290,26 +240,11 @@ export function acceptJob(s: GameState, jobId: string, truckId: string): ActionR
   return { ok: true, message: msg };
 }
 
-export function leaseTruck(s: GameState): ActionResult {
-  if (s.trucks.length >= BALANCE.maxFleet) return { ok: false, error: 'Plac jest pełny. Sąsiad już dzwonił.' };
-  const need = BALANCE.hireFee + BALANCE.leaseDeposit;
-  if (s.cash < need) return { ok: false, error: `Potrzeba ${fmtPLN(need)} na kaucję i rekrutację.` };
-  spend(s, need, 'fleet');
-  const d = generateDriver(s);
-  const t = generateTruck(s, d.id, HOME_BASE);
-  s.drivers.push(d);
-  s.trucks.push(t);
-  const msg = `Nowy zestaw: ${t.brand} ${t.model} (${t.plate}) + ${driverName(d)}. ${d.quirk}`;
-  log(s, 'good', msg);
-  return { ok: true, message: msg };
-}
-
-export const isAvailable = (t: Truck) => !t.tripId && t.serviceUntil === null;
-
-export function serviceQuote(t: Truck) {
+export function serviceQuote(s: GameState, t: Truck) {
+  const mod = serviceModifiers(s);
   const floor = agingFloor(t);
-  const cost = Math.round((1500 + Math.max(0, t.wear - floor) * 12_000) / 10) * 10;
-  return { cost, durationMin: BALANCE.serviceMin, wearAfter: floor };
+  const cost = Math.round(((1500 + Math.max(0, t.wear - floor) * 12_000) * mod.costMul) / 10) * 10;
+  return { cost, durationMin: Math.round(BALANCE.serviceMin * mod.timeMul), wearAfter: floor };
 }
 
 /** Część zużycia, której serwis nie cofnie: starzenie od przebiegu. */
@@ -320,13 +255,13 @@ function agingFloor(t: Truck) {
 export function serviceTruck(s: GameState, truckId: string): ActionResult {
   const t = s.trucks.find((x) => x.id === truckId);
   if (!t) return { ok: false, error: 'Nie ma takiego ciągnika.' };
-  if (!isAvailable(t)) return { ok: false, error: 'Ciągnik jest zajęty.' };
-  const q = serviceQuote(t);
+  if (!isIdle(t)) return { ok: false, error: 'Ciągnik jest zajęty.' };
+  const q = serviceQuote(s, t);
   if (s.cash < q.cost) return { ok: false, error: `Serwis kosztuje ${fmtPLN(q.cost)}. Nie stać nas nawet na olej.` };
   spend(s, q.cost, 'repairs');
   t.serviceUntil = s.now + q.durationMin;
   qPush(s.queue, t.serviceUntil, { type: 'SERVICE_DONE', truckId: t.id });
-  const msg = `${t.brand} ${t.model} (${t.plate}) jedzie do serwisu. Koszt ${fmtPLN(q.cost)}.`;
+  const msg = `${t.brand} ${t.model} (${t.plate}) jedzie do serwisu${s.base.workshop ? ' (własny warsztat)' : ''}. Koszt ${fmtPLN(q.cost)}.`;
   log(s, 'info', msg);
   return { ok: true, message: msg };
 }
@@ -354,6 +289,41 @@ export function giveBonus(s: GameState, driverId: string): ActionResult {
   return { ok: true, message: msg };
 }
 
+// ─── Dyspozytor ──────────────────────────────────────────────────────────────
+
+/**
+ * Najlepsze zlecenie dla auta: na czas, z zyskiem, wg zysku na godzinę.
+ * Domyślnie tylko z zapasem czasu (tak gra dyspozytorka); allowTight bierze też „na styk”.
+ */
+export function bestSafeJob(s: GameState, t: Truck, allowTight = false): Job | null {
+  let best: Job | null = null;
+  let bestScore = -Infinity;
+  for (const j of s.market) {
+    if (j.expiresAt <= s.now) continue;
+    const p = previewJob(s, j, t);
+    if (!p.onTime || (p.tight && !allowTight) || p.tooFar || p.profit <= 0) continue;
+    const score = p.profit / Math.max(60, p.durationMin);
+    if (score > bestScore) {
+      bestScore = score;
+      best = j;
+    }
+  }
+  return best;
+}
+
+/** Dyspozytorka Halina: przydziela ładunki wolnym zestawom i pilnuje serwisów. */
+function dispatch(s: GameState) {
+  for (const t of s.trucks.filter(isAvailable)) {
+    const q = serviceQuote(s, t);
+    if (t.wear > 0.5 && s.cash > q.cost * 3) {
+      serviceTruck(s, t.id);
+      continue;
+    }
+    const job = bestSafeJob(s, t);
+    if (job) acceptJob(s, job.id, t.id);
+  }
+}
+
 // ─── Obsługa zdarzeń ─────────────────────────────────────────────────────────
 
 function onTripIncident(s: GameState, tripId: string, phaseIdx: number) {
@@ -361,6 +331,7 @@ function onTripIncident(s: GameState, tripId: string, phaseIdx: number) {
   const info = trip?.phases[phaseIdx]?.incident;
   if (!trip || !info) return;
   if (info.cost > 0) spend(s, info.cost, info.kind === 'breakdown' ? 'repairs' : 'fines');
+  if (info.kind === 'itd' && info.cost > 0) addReputation(s, REPUTATION.itdFine);
   const delay = formatDuration(trip.phases[phaseIdx].end - trip.phases[phaseIdx].start);
   log(s, info.tone, `${info.text} (+${delay}${info.cost > 0 ? `, −${fmtPLN(info.cost)}` : ''})`);
 }
@@ -369,7 +340,7 @@ function onTripDone(s: GameState, tripId: string) {
   const trip = s.trips[tripId];
   if (!trip) return;
   const truck = s.trucks.find((t) => t.id === trip.truckId)!;
-  const driver = s.drivers.find((d) => d.id === trip.driverId)!;
+  const driver = s.drivers.find((d) => d.id === trip.driverId);
   const job = trip.job;
   const totalKm = trip.emptyKm + job.km;
   const overMin = Math.max(0, trip.eta - job.deadline);
@@ -387,29 +358,39 @@ function onTripDone(s: GameState, tripId: string) {
   truck.wear = clamp(truck.wear + totalKm * BALANCE.wearPerKm, 0, 1);
   truck.tripId = null;
 
-  driver.duty = trip.dutyAfter;
-  driver.kmDriven += totalKm;
-  driver.jobsDone += 1;
-  driver.stats.experience = clamp(driver.stats.experience + ((100 - driver.stats.experience) * totalKm) / 60_000);
-  driver.stats.morale = clamp(driver.stats.morale + (lateMin > 0 ? -BALANCE.lateMoraleHit : BALANCE.onTimeMoraleGain));
+  if (driver) {
+    driver.duty = trip.dutyAfter;
+    driver.kmDriven += totalKm;
+    driver.jobsDone += 1;
+    driver.stats.experience = clamp(driver.stats.experience + ((100 - driver.stats.experience) * totalKm) / 60_000);
+    driver.stats.morale = clamp(driver.stats.morale + (lateMin > 0 ? -BALANCE.lateMoraleHit : BALANCE.onTimeMoraleGain));
+  }
 
   s.totals.jobsDone += 1;
   s.totals.km += totalKm;
 
+  const nick = driver?.nickname ?? 'Kierowca';
   const city = CITY_BY_ID[job.toId].gen;
   const net = job.payment - penalty - trip.fuelCost - trip.tollCost;
   if (lateMin > 0) {
-    driver.lateJobs += 1;
+    if (driver) driver.lateJobs += 1;
     s.totals.lateJobs += 1;
-    log(s, 'bad', `${driver.nickname} spóźnił${g(driver)} się ${formatDuration(lateMin)} do ${city}. Kara ${fmtPLN(penalty)}. „Korki były”. Na czysto: ${fmtPLN(net)}.`);
-  } else if (overMin > 0) {
-    log(s, 'funny', `${driver.nickname} ${driver.female ? 'dojechała' : 'dojechał'} do ${city} ${formatDuration(overMin)} po terminie. Magazynier westchnął, ale podpisał bez kary. Na czysto: ${fmtPLN(net)}.`);
+    log(s, 'bad', `${nick} spóźnił${driver ? g(driver) : ''} się ${formatDuration(lateMin)} do ${city}. Kara ${fmtPLN(penalty)}. „Korki były”. Na czysto: ${fmtPLN(net)}.`);
+    addReputation(s, REPUTATION.late);
   } else {
-    log(s, 'good', `${driver.nickname} ${driver.female ? 'dowiozła' : 'dowiózł'} do ${city}: ${job.cargo.toLowerCase()}. Fracht ${fmtPLN(job.payment)}, paliwo i myto ${fmtPLN(trip.fuelCost + trip.tollCost)}. Na czysto: ${fmtPLN(net)}.`);
+    if (overMin > 0) {
+      log(s, 'funny', `${nick} ${driver?.female ? 'dojechała' : 'dojechał'} do ${city} ${formatDuration(overMin)} po terminie. Magazynier westchnął, ale podpisał bez kary. Na czysto: ${fmtPLN(net)}.`);
+    } else {
+      log(s, 'good', `${nick} ${driver?.female ? 'dowiozła' : 'dowiózł'} do ${city}: ${job.cargo.toLowerCase()}. Fracht ${fmtPLN(job.payment)}, paliwo i myto ${fmtPLN(trip.fuelCost + trip.tollCost)}. Na czysto: ${fmtPLN(net)}.`);
+    }
+    const urgent = job.cargo.includes('PILNE') ? REPUTATION.urgentBonus : 0;
+    const long = job.km > 400 ? REPUTATION.longHaulBonus : 0;
+    addReputation(s, REPUTATION.onTime + urgent + long);
   }
   delete s.trips[tripId];
   // Spedytor od razu szuka ładunku powrotnego z miejsca rozładunku.
-  for (let i = 0; i < BALANCE.backloadOffers; i++) s.market.push(generateJob(s, job.toId));
+  const backloads = BALANCE.backloadOffers + (s.base.office ? OFFICE.extraBackload : 0);
+  for (let i = 0; i < backloads; i++) s.market.push(generateJob(s, job.toId));
 }
 
 function onDaily(s: GameState) {
@@ -417,15 +398,14 @@ function onDaily(s: GameState) {
   const leases = s.trucks.reduce((sum, t) => sum + t.leasePerDay, 0);
   spend(s, salaries, 'salaries');
   spend(s, leases, 'lease');
+  const base = upgradesPerDay(s);
+  if (base > 0) spend(s, base, 'base');
   // Morale wraca powoli do normy: dobra passa i kryzys mijają, jeśli nic ich nie podtrzymuje.
   for (const d of s.drivers) {
     d.stats.morale = clamp(d.stats.morale + (BALANCE.moraleBaseline - d.stats.morale) * BALANCE.moraleReversion);
-  }
-  for (const t of s.trucks) {
-    if (!t.tripId) {
-      const d = s.drivers.find((x) => x.id === t.driverId)!;
-      d.stats.morale = clamp(d.stats.morale + BALANCE.idleMoraleDrift);
-    }
+    // Bezczynność (bez auta albo z autem na placu) nudzi.
+    const t = truckOfDriver(s, d);
+    if (!t || !t.tripId) d.stats.morale = clamp(d.stats.morale + BALANCE.idleMoraleDrift);
   }
   s.days.push({ day: dayIndex(s.now) - 1, cash: Math.round(s.cash), revenue: Math.round(s.today.revenue), costs: Math.round(s.today.costs) });
   if (s.days.length > 730) s.days.shift();
@@ -438,7 +418,10 @@ function onDaily(s: GameState) {
 function handle(s: GameState, ev: GameEvent) {
   switch (ev.type) {
     case 'TRIP_DONE':
-      return onTripDone(s, ev.tripId);
+      onTripDone(s, ev.tripId);
+      // Halina reaguje od razu, nie czeka na swój cykl.
+      if (s.base.dispatcher && s.base.autoDispatch) dispatch(s);
+      return;
     case 'TRIP_INCIDENT':
       return onTripIncident(s, ev.tripId, ev.phaseIdx);
     case 'SERVICE_DONE': {
@@ -455,6 +438,15 @@ function handle(s: GameState, ev: GameEvent) {
       return;
     case 'DAILY':
       return onDaily(s);
+    case 'CANDIDATES_REFRESH':
+      return refreshCandidates(s);
+    case 'OFFERS_REFRESH':
+      return refreshTruckOffers(s);
+    case 'DISPATCH':
+      if (!s.base.dispatcher) return;
+      if (s.base.autoDispatch) dispatch(s);
+      qPush(s.queue, s.now + MARKETS.dispatchEveryMin, { type: 'DISPATCH' });
+      return;
   }
 }
 

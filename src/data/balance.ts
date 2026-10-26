@@ -27,14 +27,12 @@ export const BALANCE = {
   marketRefreshMin: 180,
   /** Ile ofert z miasta rozładunku pojawia się, gdy zestaw kończy kurs. */
   backloadOffers: 3,
-  rateMinPerKm: 3.4,
-  rateMaxPerKm: 4.5,
+  rateMinPerKm: 3.5,
+  rateMaxPerKm: 4.6,
   minJobKm: 90,
 
   // Flota i ludzie
   hireFee: 2_500,
-  leaseDeposit: 6_000,
-  maxFleet: 25,
   lateMoraleHit: 5,
   /** Tolerancja klienta: spóźnienie do tylu minut przechodzi bez kary. */
   lateGraceMin: 60,

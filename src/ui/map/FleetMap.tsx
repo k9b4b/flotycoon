@@ -164,7 +164,7 @@ export function FleetMap({ snap, pace, selectedId, onSelect, preview, visible = 
         markers.current.set(t.truck.id, mk);
       }
       mk.el.textContent = String(t.fleetNo);
-      mk.el.title = `#${t.fleetNo} · ${t.driver.nickname} · ${t.truck.brand} ${t.truck.model} · ${t.statusLabel}`;
+      mk.el.title = `#${t.fleetNo} · ${t.driver?.nickname ?? 'bez kierowcy'} · ${t.truck.brand} ${t.truck.model} · ${t.statusLabel}`;
       mk.el.dataset.status = t.status;
       mk.el.classList.toggle('selected', t.truck.id === selectedId);
       if (!t.trip) {

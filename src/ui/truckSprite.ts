@@ -45,7 +45,8 @@ const SHAPES: Record<string, CabShape> = {
   Wolwo: { top: 2, slope: 2, round: 2, spoiler: false, skirt: false },
   MEN: { top: 4, slope: 2, round: 1, spoiler: false, skirt: false },
   DAFF: { top: 1, slope: 1, round: 0, spoiler: true, skirt: true },
-  Merceles: { top: 3, slope: 3, round: 3, spoiler: false, skirt: true },
+  // Actros: wysoka, prawie pionowa kabina z płaską podłogą, lekko zaokrąglony dach, osłony boczne.
+  Merceles: { top: 1, slope: 1, round: 2, spoiler: false, skirt: true },
   Iweko: { top: 4, slope: 3, round: 2, spoiler: false, skirt: false },
   Renolt: { top: 4, slope: 2, round: 1, spoiler: false, skirt: false },
   // Magnum: wysoka, prawie pionowa „szafa” z płaską podłogą.

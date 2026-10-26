@@ -101,6 +101,8 @@ const api: SimApi = {
   setAutoDispatch: (on) => act(() => E.setAutoDispatch(state!, on)),
   resolveDecision: (id, option) => act(() => E.resolveDecision(state!, id, option)),
   setAskDecisions: (on) => act(() => E.setAskDecisions(state!, on)),
+  signContract: (id) => act(() => E.signContract(state!, id)),
+  trainDriver: (driverId, courseId) => act(() => E.trainDriver(state!, driverId, courseId)),
   newGame(seed) {
     state = newGame(seed ?? ((Math.random() * 2 ** 31) | 0));
     void persist();

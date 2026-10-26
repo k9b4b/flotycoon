@@ -181,6 +181,7 @@ export function App() {
           onAccept={(j, t) => run(sim.acceptJob(j, t))}
           onPreview={mobile ? () => {} : setPreview}
           onShowOnMap={showJobOnMap}
+          onSign={(id) => run(sim.signContract(id))}
         />
         <FleetPanel
           snap={snap}
@@ -203,6 +204,7 @@ export function App() {
             assign: (truckId, driverId) => run(sim.assignDriver(truckId, driverId)),
             lease: (id) => run(sim.leaseOffer(id)),
             returnTruck: (id) => run(sim.returnTruck(id)),
+            train: (driverId, courseId) => run(sim.trainDriver(driverId, courseId)),
           }}
         />
         <CompanyPanel

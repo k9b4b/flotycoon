@@ -1,6 +1,7 @@
 import type { CatchUpReport, ActionResult } from '../engine/sim';
 import type { Snapshot } from '../engine/view';
 import type { UpgradeId } from '../data/progression';
+import type { CourseId } from '../data/development';
 
 /** Kontrakt między UI a workerem symulacji. Typowany, bez bibliotek. */
 export interface SimApi {
@@ -20,6 +21,8 @@ export interface SimApi {
   setAutoDispatch(on: boolean): ActionResult;
   resolveDecision(decisionId: string, optionId: string): ActionResult;
   setAskDecisions(on: boolean): ActionResult;
+  signContract(offerId: string): ActionResult;
+  trainDriver(driverId: string, courseId: CourseId): ActionResult;
   newGame(seed?: number): void;
   save(): Promise<boolean>;
 }

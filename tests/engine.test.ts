@@ -386,3 +386,121 @@ describe('perki i zdarzenia na trasie', () => {
     }
   });
 });
+
+describe('kontrakty i rozwój kierowców', () => {
+  it('kontrakt: kurs pojawia się na giełdzie, przepadnięcie kosztuje, trzy wpadki zrywają umowę', async () => {
+    const E = await import('../src/engine/sim');
+    const C = await import('../src/engine/contracts');
+    const s = newGame(50);
+    expect(E.signContract(s, 'x').ok).toBe(false);
+    s.reputation = 30; // ranga 1
+    C.refreshContractOffers(s);
+    expect(s.contractOffers.length).toBeGreaterThan(0);
+    const offer = s.contractOffers[0];
+    expect(E.signContract(s, offer.id).ok).toBe(true);
+    expect(E.maxContracts(s)).toBe(1);
+    C.refreshContractOffers(s);
+    expect(E.signContract(s, s.contractOffers[0].id).ok).toBe(false); // limit
+    const c = s.contracts[0];
+    advanceTo(s, c.nextRunAt - 60);
+    const job = s.market.find((j) => j.contractId === c.id)!;
+    expect(job).toBeTruthy();
+    expect(job.payment).toBe(c.paymentPerRun);
+    // nikt nie bierze: przepada
+    const cash0 = s.cash;
+    advanceTo(s, job.expiresAt + 5);
+    expect(s.market.some((j) => j.id === job.id)).toBe(false);
+    expect(c.missed).toBe(1);
+    expect(c.strikes).toBe(1);
+    expect(s.cash).toBeLessThan(cash0);
+    // kolejne dwa przepadnięcia: zerwanie
+    advanceTo(s, s.now + c.everyDays * 2 * 24 * 60 + 600);
+    expect(c.status).toBe('broken');
+  });
+
+  it('kontrakt: przyjęte kursy liczą się, a dokończona umowa daje premię', async () => {
+    const E = await import('../src/engine/sim');
+    const C = await import('../src/engine/contracts');
+    const s = newGame(51);
+    s.cash = 1_000_000;
+    s.reputation = 30;
+    C.refreshContractOffers(s);
+    const o = s.contractOffers[0];
+    o.runsTotal = 2;
+    o.everyDays = 4;
+    E.signContract(s, o.id);
+    const c = s.contracts[0];
+    const t = s.trucks[0];
+    for (let run = 0; run < 2; run++) {
+      advanceTo(s, c.nextRunAt - 60 - (run === 1 ? 0 : 0));
+      const job = s.market.find((j) => j.contractId === c.id)!;
+      expect(job).toBeTruthy();
+      // auto podstawiamy na miejsce załadunku, żeby zdążyło
+      t.cityId = job.fromId;
+      expect(E.acceptJob(s, job.id, t.id).ok).toBe(true);
+      advanceTo(s, s.trips[t.tripId!].eta + 12 * 60);
+    }
+    expect(c.runsDone).toBe(2);
+    expect(['done', 'broken']).toContain(c.status);
+    if (c.strikes === 0) {
+      expect(c.status).toBe('done');
+      expect(s.log.some((e) => e.text.includes('Kontrakt z'))).toBe(true);
+    }
+  });
+
+  it('szkolenie: kierowca znika z auta, wraca z lepszą statystyką, powtórki dają mniej', async () => {
+    const E = await import('../src/engine/sim');
+    const s = newGame(52);
+    s.cash = 1_000_000;
+    const d = s.drivers[0];
+    const t = s.trucks[0];
+    d.stats.eco = 40;
+    const g1 = E.courseGain(d, 'eco');
+    expect(E.trainDriver(s, d.id, 'eco').ok).toBe(true);
+    expect(t.driverId).toBeNull();
+    expect(E.trainDriver(s, d.id, 'law').ok).toBe(false); // już na szkoleniu
+    expect(E.assignDriver(s, t.id, d.id).ok).toBe(false);
+    advanceTo(s, s.now + 2 * 24 * 60 + 1);
+    expect(d.training).toBeNull();
+    expect(d.stats.eco).toBe(40 + g1);
+    expect(t.driverId).toBe(d.id); // wrócił do swojego auta
+    expect(E.courseGain(d, 'eco')).toBeLessThan(g1);
+    for (let i = 0; i < 2; i++) {
+      expect(E.trainDriver(s, d.id, 'eco').ok).toBe(true);
+      advanceTo(s, s.now + 2 * 24 * 60 + 1);
+    }
+    expect(E.trainDriver(s, d.id, 'eco').ok).toBe(false); // limit powtórek
+  });
+
+  it('perki z doświadczenia: po 50 tys. km można zdobyć „Zna skróty”', async () => {
+    const { checkMilestones } = await import('../src/engine/training');
+    const s = newGame(53);
+    const d = s.drivers[0];
+    let gained = false;
+    for (let i = 0; i < 60 && !gained; i++) {
+      d.perks = [];
+      d.kmDriven = 50_500;
+      checkMilestones(s, d, 49_000);
+      gained = d.perks.includes('zna_skroty');
+    }
+    expect(gained).toBe(true);
+    // bez przekroczenia progu nic się nie dzieje
+    d.perks = [];
+    d.kmDriven = 51_000;
+    for (let i = 0; i < 30; i++) checkMilestones(s, d, 50_600);
+    expect(d.perks.includes('zna_skroty')).toBe(false);
+  });
+
+  it('zapis z wersji 3 dostaje kontrakty', async () => {
+    const { migrate } = await import('../src/engine/save');
+    const s = newGame(54);
+    const old: any = JSON.parse(JSON.stringify(s));
+    old.version = 3;
+    delete old.contracts;
+    delete old.contractOffers;
+    const m = migrate(old)!;
+    expect(m.version).toBe(SAVE_VERSION);
+    expect(m.contracts).toEqual([]);
+    expect(m.costsByCategory.training).toBe(0);
+  });
+});

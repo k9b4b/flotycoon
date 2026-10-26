@@ -212,6 +212,7 @@ export function assignDriver(s: GameState, truckId: string, driverId: string | n
   }
   const d = s.drivers.find((x) => x.id === driverId);
   if (!d) return { ok: false, error: 'Nie ma takiego kierowcy.' };
+  if (d.training) return { ok: false, error: `${d.nickname} jest na szkoleniu. Wróci i usiądzie za kółkiem.` };
   const current = truckOfDriver(s, d);
   if (current === t) return { ok: true, message: `${d.nickname} już jeździ tym autem.` };
   if (current?.tripId) return { ok: false, error: `${d.nickname} jest w trasie innym autem.` };

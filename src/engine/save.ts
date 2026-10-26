@@ -23,7 +23,7 @@ const MIGRATIONS: Record<number, (s: any) => any> = {
       base: { yard, workshop: false, office: false, dispatcher: false, autoDispatch: false },
       candidates: [],
       truckOffers: [],
-      costsByCategory: { bonuses: 0, base: 0, ...s.costsByCategory },
+      costsByCategory: { bonuses: 0, base: 0, training: 0, ...s.costsByCategory },
     };
     // Rynek pracy i salon zapełnią się przy pierwszym zdarzeniu.
     qPush(out.queue, s.now, { type: 'CANDIDATES_REFRESH' });
@@ -45,6 +45,12 @@ const MIGRATIONS: Record<number, (s: any) => any> = {
       decisions: [],
     };
   },
+  // 3 → 4: kontrakty ze stałymi klientami i szkolenia kierowców.
+  3: (s) => {
+    const out = { ...s, version: 4, contracts: [], contractOffers: [] };
+    qPush(out.queue, s.now, { type: 'CONTRACT_OFFERS' });
+    return out;
+  },
 };
 
 export function migrate(raw: any): GameState | null {
@@ -57,6 +63,6 @@ export function migrate(raw: any): GameState | null {
   }
   if (s.version !== SAVE_VERSION) return null;
   // Uzupełnienia pól dodanych bez podbijania wersji (bezpieczne domyślne wartości).
-  s.costsByCategory = { bonuses: 0, base: 0, ...s.costsByCategory };
+  s.costsByCategory = { bonuses: 0, base: 0, training: 0, ...s.costsByCategory };
   return s as GameState;
 }

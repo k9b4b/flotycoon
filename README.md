@@ -83,6 +83,10 @@ Ranga odblokowuje rozbudowę bazy, a im wyższa, tym lepsi kandydaci na kierowc�
 
 **Kierowcy i auta są osobno.** Rynek pracy pokazuje kandydatów (zmiana co 2 dni) z oczekiwaną pensją rosnącą ze statystykami. Salon oferuje auta w leasingu (zmiana co 3 dni): używane z kaucją 6 000 zł, a od rangi „Lokalny przewoźnik” także nowe, oszczędniejsze i bez zużycia, ale z dwa razy wyższą ratą. Gra nie łączy par sama: kto czym jeździ, decyduje gracz. Przesadzenie kierowcy do zajętego auta zamienia kierowców miejscami (gdy żaden nie jest w trasie), a listy wyboru pokazują ocenę kierowcy (średnia umiejętności) i parametry aut. Kierowcę można zwolnić (odprawa 5 dniówek), a auto zwrócić (kara 5 rat, kaucja przepada).
 
+**Kontrakty** (`engine/contracts.ts`, liczby w `data/development.ts`): od rangi „Firma krzak” klienci proponują stałe trasy (np. co 3 dni, 6–12 kursów) za stawkę o ok. 12% lepszą od giełdy. Każdy kurs pojawia się na giełdzie dobę przed załadunkiem i wisi na górze listy. Kurs, którego nikt nie weźmie, kosztuje karę; spóźnienie albo przepadnięty kurs to wpadka, a po 3 wpadkach klient zrywa umowę. Dokończona umowa daje premię i reputację. Limit kontraktów rośnie z rangą (biuro +1), Halina bierze kursy kontraktowe w pierwszej kolejności.
+
+**Rozwój kierowców** (`engine/training.ts`): cztery szkolenia (eco-driving, tachograf i przepisy, ODTJ, „zdrowy sen i kręgosłup”) podnoszą statystykę, coraz mniej przy wysokim poziomie i kolejnych powtórkach (maks. 3). Kursy mogą wyleczyć zły perk („Ciężka noga”, „Zapominalski”, „Kocha MOP-y”), a ODTJ zamienia czasem „Pirata drogowego” w „Byłego rajdowca”. Na czas szkolenia auto zostaje bez kierowcy. Perki przychodzą też z doświadczeniem: „Zna skróty” po 50 tys. km, „Ulubieniec magazynierów” przy wielu kursach bez spóźnień, „Teczka z papierami” po długim przebiegu bez mandatów; „Pechowiec” i „Maruda” mogą zniknąć.
+
 Przy obecnym balansie prosty bot dochodzi do „Przewoźnika krajowego” po ok. 3 miesiącach gry, a po roku ma 12 aut.
 
 ## Co już jest w symulacji

@@ -6,6 +6,7 @@ import {
   addReputation,
   driverOfTruck,
   generateDriver,
+  rankIndex,
   refreshCandidates,
   refreshTruckOffers,
   serviceModifiers,
@@ -19,6 +20,9 @@ import { planTrip, type Leg } from './drivingRules';
 import { clamp, driverSpeedKmh, perkMods, rollIncidents, tripCosts } from './effects';
 import { createQueue, qPeek, qPop, qPush } from './queue';
 import { chance, createRng, pick, pickWeighted, rand, randInt, randRange } from './rng';
+import { onContractCheck, onContractOffers, onContractPost, onContractRunDone, refreshContractOffers } from './contracts';
+import { CONTRACTS } from '../data/development';
+import { checkMilestones, onTrainingDone } from './training';
 import { ALL_ROAD_EVENTS, ROAD_EVENT_BY_ID, eventCtx, optionLabel, type Outcome } from './roadEvents';
 import { roadKm } from './routes';
 import { MIN_PER_HOUR, dayIndex, formatDuration, formatGameTime, nextMidnight } from './time';
@@ -27,6 +31,8 @@ import { SAVE_VERSION, type Driver, type GameEvent, type GameState, type Inciden
 // Ponowny eksport, żeby UI, worker i narzędzia miały jedno miejsce importu.
 export { driverName, fmtPLN, g, log, type ActionResult };
 export * from './company';
+export { activeContracts, maxContracts, signContract } from './contracts';
+export { courseGain, timesTaken, trainDriver } from './training';
 export { ALL_ROAD_EVENTS as ROAD_EVENTS, ROAD_EVENT_BY_ID, eventCtx } from './roadEvents';
 
 // ─── Dostępność ──────────────────────────────────────────────────────────────
@@ -100,8 +106,10 @@ export function generateJob(s: GameState, forcedFrom?: string): Job {
 const marketSize = (s: GameState) => BALANCE.marketSize + (s.base.office ? OFFICE.extraOffers : 0);
 
 function refillMarket(s: GameState) {
-  s.market = s.market.filter((j) => j.expiresAt > s.now);
-  while (s.market.length < marketSize(s)) s.market.push(generateJob(s));
+  // Kursy kontraktowe zdejmuje z giełdy dopiero sprawdzenie kontraktu (przepadnięcie kosztuje).
+  s.market = s.market.filter((j) => j.contractId || j.expiresAt > s.now);
+  let open = s.market.filter((j) => !j.contractId).length;
+  while (open++ < marketSize(s)) s.market.push(generateJob(s));
 }
 
 // ─── Nowa gra ────────────────────────────────────────────────────────────────
@@ -123,7 +131,7 @@ export function newGame(seed: number): GameState {
     days: [],
     today: { revenue: 0, costs: 0 },
     totals: { revenue: 0, costs: 0, jobsDone: 0, km: 0, lateJobs: 0, penalties: 0 },
-    costsByCategory: { fuel: 0, toll: 0, salaries: 0, lease: 0, repairs: 0, fines: 0, fleet: 0, bonuses: 0, base: 0 },
+    costsByCategory: { fuel: 0, toll: 0, salaries: 0, lease: 0, repairs: 0, fines: 0, fleet: 0, bonuses: 0, base: 0, training: 0 },
     nextId: 1,
     reputation: 0,
     base: { yard: 0, workshop: false, office: false, dispatcher: false, autoDispatch: false },
@@ -131,6 +139,8 @@ export function newGame(seed: number): GameState {
     truckOffers: [],
     settings: { askDecisions: true },
     decisions: [],
+    contracts: [],
+    contractOffers: [],
   };
   const d = generateDriver(s);
   // Pierwszy kierowca jest trochę lepszy, żeby start nie był karą.
@@ -147,6 +157,7 @@ export function newGame(seed: number): GameState {
   log(s, 'info', `Zatrudniono: ${driverName(d)}. ${d.quirk}`);
   qPush(s.queue, nextMidnight(s.now), { type: 'DAILY' });
   qPush(s.queue, s.now + BALANCE.marketRefreshMin, { type: 'MARKET_REFRESH' });
+  qPush(s.queue, s.now + 7 * 24 * 60, { type: 'CONTRACT_OFFERS' });
   return s;
 }
 
@@ -232,6 +243,10 @@ export function acceptJob(s: GameState, jobId: string, truckId: string): ActionR
   s.trips[trip.id] = trip;
   truck.tripId = trip.id;
   s.market = s.market.filter((j) => j.id !== jobId);
+  if (job.contractId) {
+    const c = s.contracts.find((x) => x.id === job.contractId);
+    if (c?.pendingJobId === job.id) c.pendingJobId = null;
+  }
   qPush(s.queue, trip.eta, { type: 'TRIP_DONE', tripId: trip.id });
   phases.forEach((p, i) => {
     if (p.kind !== 'incident' || !p.incident) return;
@@ -328,6 +343,7 @@ function applyDecision(s: GameState, dec: PendingDecision, optionId: string | nu
   const o = opt.resolve(c);
   if (o.delayMin) delayTrip(trip, s.now, o.delayMin, { kind: 'event', text: `${def.title}: ${o.text}`, cost: o.cost ?? 0, tone: o.tone });
   if (o.cost) spend(s, o.cost, o.costCat ?? 'repairs');
+  if (o.costCat === 'fines') d.fines = (d.fines ?? 0) + 1;
   if (o.payment) trip.job = { ...trip.job, payment: Math.max(0, trip.job.payment + o.payment) };
   if (o.fuelSaving) trip.fuelCost = Math.max(0, trip.fuelCost - o.fuelSaving);
   if (o.deadline) trip.job = { ...trip.job, deadline: trip.job.deadline + o.deadline };
@@ -423,7 +439,8 @@ export function bestSafeJob(s: GameState, t: Truck, allowTight = false): Job | n
     if (j.expiresAt <= s.now) continue;
     const p = previewJob(s, j, t);
     if (!p.onTime || (p.tight && !allowTight) || p.tooFar || p.profit <= 0) continue;
-    const score = p.profit / Math.max(60, p.durationMin);
+    // Kurs z kontraktu ma pierwszeństwo: przepadnięcie kosztuje karę i reputację.
+    const score = (p.profit / Math.max(60, p.durationMin)) * (j.contractId ? 3 : 1);
     if (score > bestScore) {
       bestScore = score;
       best = j;
@@ -459,7 +476,11 @@ function onTripIncident(s: GameState, ev: Extract<GameEvent, { type: 'TRIP_INCID
     return;
   }
   if (info.cost > 0) spend(s, info.cost, info.kind === 'breakdown' ? 'repairs' : 'fines');
-  if (info.kind === 'itd' && info.cost > 0) addReputation(s, REPUTATION.itdFine);
+  if (info.kind === 'itd' && info.cost > 0) {
+    addReputation(s, REPUTATION.itdFine);
+    const d = s.drivers.find((x) => x.id === trip.driverId);
+    if (d) d.fines = (d.fines ?? 0) + 1;
+  }
   const delay = formatDuration(trip.phases[phaseIdx].end - trip.phases[phaseIdx].start);
   log(s, info.tone, `${info.text} (+${delay}${info.cost > 0 ? `, −${fmtPLN(info.cost)}` : ''})`);
 }
@@ -490,6 +511,7 @@ function onTripDone(s: GameState, tripId: string): boolean {
   truck.wear = clamp(truck.wear + totalKm * BALANCE.wearPerKm * (driver ? perkMods(driver).wearMul : 1), 0, 1);
   truck.tripId = null;
 
+  const kmBefore = driver?.kmDriven ?? 0;
   if (driver) {
     driver.duty = trip.dutyAfter;
     driver.kmDriven += totalKm;
@@ -520,6 +542,8 @@ function onTripDone(s: GameState, tripId: string): boolean {
     addReputation(s, REPUTATION.onTime + urgent + long + (driver ? perkMods(driver).repOnTime : 0));
   }
   delete s.trips[tripId];
+  if (job.contractId) onContractRunDone(s, job.contractId, lateMin > 0);
+  if (driver) checkMilestones(s, driver, kmBefore);
   // Spedytor od razu szuka ładunku powrotnego z miejsca rozładunku.
   const backloads = BALANCE.backloadOffers + (s.base.office ? OFFICE.extraBackload : 0);
   for (let i = 0; i < backloads; i++) s.market.push(generateJob(s, job.toId));
@@ -539,11 +563,13 @@ function onDaily(s: GameState) {
     d.stats.morale = clamp(d.stats.morale + (target - d.stats.morale) * BALANCE.moraleReversion);
     // Bezczynność (bez auta albo z autem na placu) nudzi.
     const t = truckOfDriver(s, d);
-    if (!t || !t.tripId) d.stats.morale = clamp(d.stats.morale + BALANCE.idleMoraleDrift);
+    if ((!t || !t.tripId) && !d.training) d.stats.morale = clamp(d.stats.morale + BALANCE.idleMoraleDrift);
   }
   s.days.push({ day: dayIndex(s.now) - 1, cash: Math.round(s.cash), revenue: Math.round(s.today.revenue), costs: Math.round(s.today.costs) });
   if (s.days.length > 730) s.days.shift();
   s.today = { revenue: 0, costs: 0 };
+  // Po awansie klienci od razu chcą rozmawiać o umowach.
+  if (s.contractOffers.length === 0 && rankIndex(s.reputation) >= CONTRACTS.minRank) refreshContractOffers(s);
   if (s.cash < 0) log(s, 'bad', `Konto na minusie (${fmtPLN(s.cash)}). Bank dzwoni i nie brzmi wesoło.`);
   else if (chance(s.rng, 0.25)) log(s, 'funny', pick(s.rng, DAILY_FLAVOR));
   qPush(s.queue, nextMidnight(s.now), { type: 'DAILY' });
@@ -559,6 +585,14 @@ function handle(s: GameState, ev: GameEvent, interactive: boolean) {
       return onTripIncident(s, ev);
     case 'ROAD_EVENT':
       return onRoadEvent(s, ev.tripId, interactive);
+    case 'CONTRACT_POST':
+      return onContractPost(s, ev.contractId);
+    case 'CONTRACT_CHECK':
+      return onContractCheck(s, ev.contractId, ev.jobId);
+    case 'CONTRACT_OFFERS':
+      return onContractOffers(s);
+    case 'TRAINING_DONE':
+      return onTrainingDone(s, ev.driverId);
     case 'SERVICE_DONE': {
       const t = s.trucks.find((x) => x.id === ev.truckId);
       if (!t) return;

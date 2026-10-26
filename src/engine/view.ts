@@ -4,7 +4,8 @@ import { kmAt, phaseAt } from './drivingRules';
 import { ROAD_EVENT_BY_ID, eventCtx, optionHint, optionLabel } from './roadEvents';
 import { RANKS, UPGRADES, YARD, type Upgrade } from '../data/progression';
 import { driverCap, driverOfTruck, fleetCap, isAvailable, previewJob, rankIndex, serviceQuote, truckOfDriver, upgradesPerDay, type JobPreview } from './sim';
-import type { BaseState, DayRecord, Driver, GameState, Job, LogEntry, Phase, PhaseKind, Truck, TruckOffer } from './types';
+import { maxContracts } from './contracts';
+import type { BaseState, Contract, ContractOffer, DayRecord, Driver, GameState, Job, LogEntry, Phase, PhaseKind, Truck, TruckOffer } from './types';
 
 /**
  * Widok stanu dla UI. Worker wysyła go kilka razy na sekundę,
@@ -118,6 +119,10 @@ export interface Snapshot {
   candidates: Driver[];
   truckOffers: TruckOffer[];
   settings: GameState['settings'];
+  /** Aktywne kontrakty i kilka ostatnio zakończonych. */
+  contracts: Contract[];
+  contractOffers: ContractOffer[];
+  contractLimit: number;
   /** Zdarzenia czekające na decyzję gracza (zegar stoi). */
   decisions: DecisionView[];
 }
@@ -275,6 +280,9 @@ export function buildSnapshot(s: GameState): Snapshot {
     candidates: s.candidates,
     truckOffers: s.truckOffers,
     settings: s.settings,
+    contracts: [...s.contracts.filter((c) => c.status === 'active'), ...s.contracts.filter((c) => c.status !== 'active').slice(-4).reverse()],
+    contractOffers: s.contractOffers,
+    contractLimit: maxContracts(s),
     decisions: s.decisions.flatMap((dec): DecisionView[] => {
       const def = ROAD_EVENT_BY_ID[dec.eventId];
       const trip = s.trips[dec.tripId];

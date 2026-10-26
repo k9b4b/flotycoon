@@ -703,3 +703,31 @@ select {
   .fc-truckrow-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 13px; color: var(--muted); }
   .fc-truckrow-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 }
+
+/* Kontrakty */
+.badge.contract { color: var(--info); border-color: var(--info); margin-right: 4px; }
+.job.is-contract { box-shadow: inset 3px 0 0 var(--info); padding-left: 8px; }
+.job.is-contract.open { box-shadow: inset 3px 0 0 var(--accent); }
+.contract-left { color: var(--info); font-weight: 600; }
+.sub-h { margin: 6px 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.contract-card.ended { opacity: .7; }
+.contract-progress { display: flex; gap: 3px; flex-wrap: wrap; }
+.contract-progress span { width: 14px; height: 8px; border-radius: 2px; background: var(--line-strong); }
+.contract-progress span.ok { background: var(--good); }
+.contract-progress span.miss { background: var(--bad); }
+.strikes { display: inline-flex; gap: 4px; }
+.strikes span { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--bad); }
+.strikes span.on { background: var(--bad); }
+.staff-line .warn { color: var(--accent); }
+
+/* Szkolenia */
+.training-on { color: var(--info); font-weight: 600; }
+.course-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.course { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; background: var(--panel); }
+.course-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.course-desc { font-size: 12px; }
+.course-foot { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.course-foot .good { color: var(--good); font-weight: 600; flex: 1; }
+.course-foot .muted:first-child { flex: 1; }
+.course-note { margin: 0; font-size: 12px; }
+.contract-card .fc-driver strong { display: block; }

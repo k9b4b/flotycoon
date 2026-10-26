@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { BALANCE } from '../../data/balance';
+import type { CourseId } from '../../data/development';
 import { CITY_BY_ID } from '../../data/cities';
 import { MARKETS } from '../../data/progression';
 import { dutyAfterIdle } from '../../engine/drivingRules';
@@ -27,6 +28,7 @@ export interface FleetActions {
   assign: (truckId: string, driverId: string | null) => void;
   lease: (offerId: string) => void;
   returnTruck: (truckId: string) => void;
+  train: (driverId: string, courseId: CourseId) => void;
 }
 
 const stop = (fn: () => void) => (e: { stopPropagation(): void }) => {

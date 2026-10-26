@@ -23,7 +23,7 @@ function driverOption(dv: DriverView, target: TruckView) {
 /** Wybór kierowcy dla auta: wszyscy, którzy nie są w trasie, najlepsi na górze. */
 export function DriverPicker({ snap, t, a, placeholder }: { snap: Snapshot; t: TruckView; a: FleetActions; placeholder: string }) {
   const options = snap.drivers
-    .filter((dv) => !dv.onTrip && dv.driver.id !== t.driver?.id)
+    .filter((dv) => !dv.onTrip && !dv.driver.training && dv.driver.id !== t.driver?.id)
     .sort((x, y) => Number(!!x.truckId) - Number(!!y.truckId) || driverScore(y.driver) - driverScore(x.driver));
   if (options.length === 0) return null;
   return (
@@ -48,7 +48,7 @@ function truckOption(t: TruckView, movingFrom: boolean) {
 
 /** Wybór auta dla kierowcy: każde, które nie jest w trasie, najoszczędniejsze na górze. */
 export function TruckPicker({ snap, dv, a }: { snap: Snapshot; dv: DriverView; a: FleetActions }) {
-  if (dv.onTrip) return null;
+  if (dv.onTrip || dv.driver.training) return null;
   const options = snap.fleet
     .filter((t) => !t.trip && t.truck.id !== dv.truckId)
     .sort((x, y) => Number(!!x.driver) - Number(!!y.driver) || x.truck.fuelL100 * (1 + x.truck.wear) - y.truck.fuelL100 * (1 + y.truck.wear));

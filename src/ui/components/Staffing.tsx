@@ -1,4 +1,9 @@
+import { useState } from 'react';
 import { BALANCE } from '../../data/balance';
+import { COURSES, COURSE_BY_ID, TRAINING } from '../../data/development';
+import { courseGain, timesTaken } from '../../engine/training';
+import { formatGameTime } from '../../engine/time';
+import type { Driver } from '../../engine/types';
 import { MARKETS, RANKS } from '../../data/progression';
 import type { Snapshot } from '../../engine/view';
 import { km, pct, pln } from '../format';
@@ -32,7 +37,11 @@ export function DriversList({ snap, a, onHire }: { snap: Snapshot; a: FleetActio
             <span className="num">{pln(d.salaryPerDay)}/dzień</span>
           </div>
           <div className="staff-line">
-            {truckLabel ? (
+            {d.training ? (
+              <span className="training-on">
+                Na szkoleniu: {COURSE_BY_ID[d.training.course].name} · do {formatGameTime(d.training.until)}
+              </span>
+            ) : truckLabel ? (
               <span className="muted">
                 {truckLabel}
                 {onTrip ? ' · w trasie' : ''}
@@ -42,6 +51,7 @@ export function DriversList({ snap, a, onHire }: { snap: Snapshot; a: FleetActio
             )}
             <TraitChips d={d} />
           </div>
+          <Training d={d} onTrip={onTrip} cash={snap.cash} a={a} />
           <div className="fc-actions">
             <TruckPicker snap={snap} dv={dv} a={a} />
             <button className="btn small danger" disabled={onTrip} onClick={() => a.fire(d.id)} title={onTrip ? 'Zwolnić można po rozładunku' : undefined}>
@@ -55,6 +65,57 @@ export function DriversList({ snap, a, onHire }: { snap: Snapshot; a: FleetActio
         Zobacz kandydatów na rynku pracy
       </button>
     </>
+  );
+}
+
+const STAT_SHORT = { experience: 'doświadczenie', eco: 'eco-driving', reliability: 'niezawodność', stamina: 'kondycja' } as const;
+
+/** Szkolenia kierowcy: rozwijane, żeby nie zaśmiecać listy. */
+function Training({ d, onTrip, cash, a }: { d: Driver; onTrip: boolean; cash: number; a: FleetActions }) {
+  const [open, setOpen] = useState(false);
+  const busy = onTrip || !!d.training;
+  return (
+    <div className="training">
+      <button className="btn small" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {open ? 'Zwiń szkolenia' : 'Szkolenia'}
+      </button>
+      {open && (
+        <div className="course-list">
+          {busy && <p className="muted course-note">{d.training ? 'Już na szkoleniu.' : 'Szkolenie można zacząć po rozładunku.'}</p>}
+          {COURSES.map((c) => {
+            const n = timesTaken(d, c.id);
+            const gain = courseGain(d, c.id);
+            const maxed = n >= TRAINING.maxRepeats;
+            const fix = c.fixes && d.perks.includes(c.fixes);
+            const conv = c.converts && d.perks.includes(c.converts[0]);
+            return (
+              <div key={c.id} className="course">
+                <div className="course-head">
+                  <strong>{c.name}</strong>
+                  <span className="num muted">
+                    {pln(c.cost)} · {c.days} {c.days === 1 ? 'dzień' : 'dni'}
+                  </span>
+                </div>
+                <div className="muted course-desc">{c.desc}</div>
+                <div className="course-foot">
+                  <span className={maxed ? 'muted' : 'good'}>
+                    {maxed ? 'Kurs zaliczony do oporu' : `${STAT_SHORT[c.stat]} +${gain}`}
+                    {(fix || conv) && !maxed ? ' · może pomóc na cechę!' : ''}
+                  </span>
+                  <span className="muted num">
+                    {n}/{TRAINING.maxRepeats}
+                  </span>
+                  <button className="btn small primary" disabled={busy || maxed || cash < c.cost} onClick={() => a.train(d.id, c.id)}>
+                    Zapisz
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          <p className="muted course-note">Na czas szkolenia auto zostaje bez kierowcy: posadź w nim zmiennika. Po kursie kierowca wraca do swojego auta.</p>
+        </div>
+      )}
+    </div>
   );
 }
 

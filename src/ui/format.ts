@@ -16,6 +16,7 @@ export const COST_LABELS: Record<string, string> = {
   fleet: 'Rekrutacja, kaucje, inwestycje',
   bonuses: 'Premie',
   base: 'Baza, biuro, dyspozytor',
+  training: 'Szkolenia',
 };
 
 export const STAT_LABELS: Record<string, string> = {

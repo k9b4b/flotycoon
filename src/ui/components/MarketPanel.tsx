@@ -3,6 +3,7 @@ import { formatDuration, formatGameTime } from '../../engine/time';
 import type { Snapshot } from '../../engine/view';
 import { city, km, pln, plnSigned } from '../format';
 import type { MapPreview } from '../map/FleetMap';
+import { ContractsView } from './Contracts';
 
 export function MarketPanel({
   snap,
@@ -11,6 +12,7 @@ export function MarketPanel({
   onAccept,
   onPreview,
   onShowOnMap,
+  onSign,
 }: {
   snap: Snapshot;
   truckId: string | null;
@@ -18,20 +20,25 @@ export function MarketPanel({
   onAccept: (jobId: string, truckId: string) => void;
   onPreview: (p: MapPreview | null) => void;
   onShowOnMap: (p: MapPreview) => void;
+  onSign: (offerId: string) => void;
 }) {
+  const [view, setView] = useState<'market' | 'contracts'>('market');
   // Rozwinięte zlecenie: dopiero wtedy pokazujemy przyciski, żeby lista była czytelna.
   const [openId, setOpenId] = useState<string | null>(null);
   const free = snap.fleet.filter((t) => t.status === 'idle');
   const active = free.find((t) => t.truck.id === truckId) ?? free[0];
+  // Kursy z kontraktów zawsze na górze: przepadnięcie kosztuje.
+  const pinned = (j: (typeof snap.market)[number]) => (j.contractId ? 1e7 : 0);
   const jobs = [...snap.market].sort((a, b) => {
-    if (!active) return b.payment - a.payment;
+    if (!active) return pinned(b) - pinned(a) || b.payment - a.payment;
     const pa = a.previews.find((p) => p.truckId === active.truck.id);
     const pb = b.previews.find((p) => p.truckId === active.truck.id);
     // Najpierw bezpieczne, potem „na styk”, na końcu niewykonalne; w grupie wg zysku na godzinę.
     const score = (p?: (typeof a.previews)[number]) =>
       p ? (p.onTime && !p.tooFar ? (p.tight ? 1e6 : 2e6) : 0) + p.profit / Math.max(60, p.durationMin) : 0;
-    return score(pb) - score(pa);
+    return pinned(b) + score(pb) - (pinned(a) + score(pa));
   });
+  const activeContracts = snap.contracts.filter((c) => c.status === 'active').length;
 
   return (
     <section className="panel area-market">
@@ -55,9 +62,21 @@ export function MarketPanel({
           </span>
         )}
       </div>
+      <div className="subtabs" role="tablist" aria-label="Widok giełdy">
+        <button role="tab" aria-selected={view === 'market'} className={view === 'market' ? 'on' : ''} onClick={() => setView('market')}>
+          Zlecenia <span className="num muted">{snap.market.length}</span>
+        </button>
+        <button role="tab" aria-selected={view === 'contracts'} className={view === 'contracts' ? 'on' : ''} onClick={() => setView('contracts')}>
+          Kontrakty{' '}
+          <span className="num muted">
+            {activeContracts}/{snap.contractLimit}
+          </span>
+        </button>
+      </div>
       <div className="panel-body scroll">
-        {jobs.length === 0 && <div className="empty">Giełda pusta. Spedytorzy poszli na kawę.</div>}
-        {jobs.map((j) => {
+        {view === 'contracts' && <ContractsView snap={snap} onSign={onSign} />}
+        {view === 'market' && jobs.length === 0 && <div className="empty">Giełda pusta. Spedytorzy poszli na kawę.</div>}
+        {view === 'market' && jobs.map((j) => {
           const p = active ? j.previews.find((x) => x.truckId === active.truck.id) : undefined;
           const timeLeft = j.deadline - snap.now;
           const open = openId === j.id;
@@ -67,7 +86,7 @@ export function MarketPanel({
           };
           return (
             <div
-              className={`job${open ? ' open' : ''}`}
+              className={`job${open ? ' open' : ''}${j.contractId ? ' is-contract' : ''}`}
               key={j.id}
               role="button"
               tabIndex={0}
@@ -87,7 +106,7 @@ export function MarketPanel({
                   {city(j.fromId)} → {city(j.toId)} <span className="muted num" style={{ fontSize: 12 }}>{km(j.km)}</span>
                 </div>
                 <div className="meta">
-                  {j.cargo} · {j.weightT} t · {j.client}
+                  {j.contractId && <span className="badge contract">kontrakt</span>} {j.cargo} · {j.weightT} t · {j.client}
                 </div>
               </div>
               <div className="money">
@@ -100,6 +119,11 @@ export function MarketPanel({
                 <span className="muted" title={`Termin dostawy: ${formatGameTime(j.deadline)}`}>
                   ⏱ {formatDuration(timeLeft)}
                 </span>
+                {j.contractId && (
+                  <span className="contract-left" title="Po tym czasie kurs przepada, a klient liczy karę">
+                    przyjąć w {formatDuration(Math.max(0, j.expiresAt - snap.now))}
+                  </span>
+                )}
                 {p && (
                   <>
                     {p.emptyKm > 0 && <span className="muted">dojazd {km(p.emptyKm)}</span>}

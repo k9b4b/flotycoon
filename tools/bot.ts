@@ -5,7 +5,10 @@
 import { RANKS, UPGRADES, YARD } from '../src/data/progression';
 import {
   acceptJob,
+  activeContracts,
   assignDriver,
+  maxContracts,
+  signContract,
   bestSafeJob,
   buyUpgrade,
   driverCap,
@@ -55,6 +58,11 @@ export function botTick(s: GameState, opts: { grow?: boolean } = {}) {
       leaseOffer(s, offer.id);
       hireDriver(s, cand.id);
     }
+  }
+  // Kontrakty: bierze stałe trasy, gdy ma zapas aut (jeden kontrakt na trzy zestawy).
+  for (const o of [...s.contractOffers]) {
+    if (s.trucks.length < 4 || activeContracts(s).length >= Math.min(maxContracts(s), Math.floor(s.trucks.length / 3))) break;
+    signContract(s, o.id);
   }
   // Gra nie łączy par sama: bot sadza wolnych kierowców w puste auta na placu.
   const freeDrivers = s.drivers.filter((d) => !truckOfDriver(s, d));

@@ -7,7 +7,7 @@
  *   npx tsx tools/routes/build-routes.ts
  */
 import { writeFileSync } from 'node:fs';
-import { CITIES } from '../../src/data/cities';
+import { CITIES } from '../../src/data/cities.ts';
 
 const GH = process.env.GH_URL ?? 'http://localhost:8989';
 const OUT = new URL('../../src/data/routes.json', import.meta.url);

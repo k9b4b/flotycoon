@@ -43,7 +43,8 @@ jobs:
         run: echo "week=$(date +%G-%V)" >> "$GITHUB_OUTPUT"
 
       - name: Cache danych OSM i GraphHoppera
-        uses: actions/cache@v4
+        id: cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             data/graphhopper.jar
@@ -58,6 +59,16 @@ jobs:
           [ -f data/region.osm.pbf ] || curl -fL -o data/region.osm.pbf "https://download.geofabrik.de/${{ inputs.region }}-latest.osm.pbf"
           ls -lh data
 
+      # Zapis cache od razu po pobraniu, żeby przetrwał nawet nieudany przebieg.
+      - name: Zapisz cache danych
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            data/graphhopper.jar
+            data/region.osm.pbf
+          key: osm-${{ inputs.region }}-gh${{ env.GH_VERSION }}-${{ steps.week.outputs.week }}
+
       - name: Import grafu i start serwera
         run: |
           java -Xmx10g -jar data/graphhopper.jar server tools/routes/config.yml > data/gh.log 2>&1 &
@@ -71,7 +82,7 @@ jobs:
           echo "::error title=GraphHopper nie wystartował w 60 min::$(eval "$ANNOTATE_LOG")"; exit 1
 
       - name: Policz trasy
-        run: set +e; npx tsx tools/routes/build-routes.ts 2>&1 | tee data/routes.log; test ${PIPESTATUS[0]} -eq 0 || { echo "::error title=Liczenie tras::$(tail -n 30 data/routes.log | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"; exit 1; }
+        run: set +e; node tools/routes/build-routes.ts 2>&1 | tee data/routes.log; test ${PIPESTATUS[0]} -eq 0 || { echo "::error title=Liczenie tras::$(tail -n 30 data/routes.log | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"; exit 1; }
 
       - name: Log GraphHoppera (przy błędzie)
         if: failure()

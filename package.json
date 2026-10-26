@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "sim:year": "tsx tools/simulate-year.ts",
     "geo": "node tools/build-geo.mjs",
-    "routes": "tsx tools/routes/build-routes.ts"
+    "routes": "node tools/routes/build-routes.ts"
   },
   "dependencies": {
     "react": "^19.2.0",

@@ -18,7 +18,7 @@ Gra jest wystawiona na GitHub Pages: **https://k9b4b.github.io/flotycoon/** (dzi
 
 ## Zakładanie firmy
 
-Przy pierwszym uruchomieniu (albo po „Zacznij od nowa z inną firmą” pod „?”) kreator prowadzi przez 4 kroki (`ui/components/SetupWizard.tsx`): nazwa firmy (z humorystycznymi podpowiedziami), siedziba (jedno z 13 miast; tu odbiera się auta z salonu i stąd częściej startują zlecenia), pierwszy ciągnik z trzech ofert (od najtańszej raty po najwyższą) i pierwszy kierowca z trzech kandydatów (od najtańszego po najlepszego z ogłoszeń). Propozycje liczy silnik (`setupOptions(seed)`), wybory trafiają do `newGame(seed, setup)`.
+Przy pierwszym uruchomieniu (albo po „Zacznij od nowa z inną firmą” pod „?”) kreator prowadzi przez 4 kroki (`ui/components/SetupWizard.tsx`): nazwa firmy (z humorystycznymi podpowiedziami), siedziba (jedno z 13 miast z własnymi plusami i minusami w `data/hq.ts`: liczba ofert na giełdzie, stawki zleceń z siedziby, pensje lokalnego rynku pracy, koszt rozbudowy bazy i dotacja na start; tu odbiera się auta z salonu i stąd częściej startują zlecenia. Bot w każdym mieście kończy pół roku w przedziale ok. ±15–20% wartości firmy), pierwszy ciągnik z trzech ofert (od najtańszej raty po najwyższą) i pierwszy kierowca z trzech kandydatów (od najtańszego po najlepszego z ogłoszeń). Propozycje liczy silnik (`setupOptions(seed)`), wybory trafiają do `newGame(seed, setup)`.
 
 ## Samouczek
 

@@ -1,5 +1,6 @@
 import { BALANCE } from '../data/balance';
 import { CITIES, CITY_BY_ID, HOME_BASE } from '../data/cities';
+import { hqProfile } from '../data/hq';
 import { ARRIVE_FLAVOR, CARGO, CB_DEPART, CLIENTS, COMPANY_START, DAILY_FLAVOR, LATE_EXCUSES, NICKNAMES } from '../data/flavor';
 import { MARKETS, OFFICE, REPUTATION } from '../data/progression';
 import {
@@ -56,7 +57,7 @@ function pickOrigin(s: GameState): string {
   const x = rand(r);
   if (idle.length > 0 && x < 0.35) return pick(r, idle);
   if (heading.length > 0 && x < 0.6) return pick(r, heading);
-  if (x < 0.7) return s.hqCityId ?? HOME_BASE; // klienci z okolicy siedziby znają firmę
+  if (x < 0.6 + hqProfile(s.hqCityId).localShare) return s.hqCityId ?? HOME_BASE; // klienci z okolicy siedziby znają firmę
   return pickWeighted(r, CITIES, (c) => c.weight).id;
 }
 
@@ -74,7 +75,8 @@ export function generateJob(s: GameState, forcedFrom?: string): Job {
   const ratePerKm = randRange(r, BALANCE.rateMinPerKm, BALANCE.rateMaxPerKm) * cargo.rateMul * (urgent ? 1.2 : 1);
   // Krótkie trasy mają wyższą stawkę za km (realnie tak jest: załadunek kosztuje tyle samo).
   const shortBonus = km < 250 ? 1 + (250 - km) / 600 : 1;
-  const payment = Math.round((km * ratePerKm * shortBonus) / 10) * 10;
+  const local = fromId === (s.hqCityId ?? HOME_BASE) ? hqProfile(s.hqCityId).localRate : 1;
+  const payment = Math.round((km * ratePerKm * shortBonus * local) / 10) * 10;
   // Czas kursu dla typowego kierowcy w połowie dnia pracy: z przerwami i ewentualnym
   // odpoczynkiem dobowym, tak jak liczy go realny spedytor.
   const est = planTrip(
@@ -104,7 +106,7 @@ export function generateJob(s: GameState, forcedFrom?: string): Job {
   };
 }
 
-const marketSize = (s: GameState) => BALANCE.marketSize + (s.base.office ? OFFICE.extraOffers : 0);
+const marketSize = (s: GameState) => BALANCE.marketSize + (s.base.office ? OFFICE.extraOffers : 0) + hqProfile(s.hqCityId).market;
 
 function refillMarket(s: GameState) {
   // Kursy kontraktowe zdejmuje z giełdy dopiero sprawdzenie kontraktu (przepadnięcie kosztuje).
@@ -151,8 +153,9 @@ function boostStarter(d: Driver) {
 }
 
 /** Propozycje do kreatora: trzy auta (od taniego po porządne) i trzech kandydatów (od świeżaka po rutyniarza). */
-export function setupOptions(seed: number): SetupOptions {
+export function setupOptions(seed: number, hqCityId?: string): SetupOptions {
   const s = blankState(seed ^ 0x5eed);
+  s.hqCityId = hqCityId; // pensje kandydatów zależą od lokalnego rynku pracy
   const trucks = Array.from({ length: 8 }, () => {
     const o = usedOffer(s);
     o.wear = Math.min(o.wear, 0.35);
@@ -211,6 +214,8 @@ export function newGame(seed: number, setup?: GameSetup): GameState {
   const s = blankState(seed);
   const hq = setup && CITY_BY_ID[setup.hqCityId] ? setup.hqCityId : HOME_BASE;
   s.hqCityId = hq;
+  const grant = hqProfile(hq).grant;
+  if (grant > 0) s.cash += grant;
   const name = setup?.companyName.trim().slice(0, 40);
   if (name) s.companyName = name;
   let d: Driver;
@@ -230,6 +235,7 @@ export function newGame(seed: number, setup?: GameSetup): GameState {
   refreshTruckOffers(s);
   for (const line of COMPANY_START) log(s, 'funny', line.replace('{company}', s.companyName).replace('{cash}', fmtPLN(s.cash)));
   log(s, 'info', `Siedziba: ${CITY_BY_ID[hq].name}. Pierwszy ciągnik: ${first.brand} ${first.model} (${first.plate}).`);
+  if (grant > 0) log(s, 'good', `Urząd marszałkowski przyznał dotację na rozwój regionu: ${fmtPLN(grant)}. Pani z urzędu prosi o zdjęcie ciężarówki do folderu.`);
   log(s, 'info', `Zatrudniono: ${driverName(d)}. ${d.quirk}`);
   qPush(s.queue, nextMidnight(s.now), { type: 'DAILY' });
   qPush(s.queue, s.now + BALANCE.marketRefreshMin, { type: 'MARKET_REFRESH' });

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { BALANCE } from '../../data/balance';
 import { CITIES } from '../../data/cities';
+import { hqProfile } from '../../data/hq';
 import type { SetupOptions } from '../../engine/sim';
 import { DriverAvatar, TruckSprite } from '../avatar';
 import { km, pct, pln } from '../format';
@@ -12,21 +13,18 @@ import { PerkList, ScoreBadge, StatBars, driverScore, wearColor } from './driver
  * Propozycje aut i ludzi przychodzą z silnika (setupOptions), więc są takie jak w reszcie gry.
  */
 
-const CITY_BLURB: Record<string, string> = {
-  WAW: 'Stolica: najwięcej zleceń w kraju. I najwięcej korków.',
-  KRK: 'Południe, blisko Śląska i gór. Smok gratis.',
-  LDZ: 'Sam środek Polski, A1 i A2 pod nosem.',
-  STR: 'Węzeł A1/A2 i magazyny po horyzont. To nie miejsce, to stan umysłu.',
-  WRO: 'Zachód blisko, Niemcy za miedzą (kiedyś się przyda).',
-  POZ: 'A2 na zachód, porządek i rogale świętomarcińskie.',
-  GDN: 'Port i kontenery, ale do południa daleko.',
-  SZZ: 'Róg mapy: do Berlina bliżej niż do Warszawy.',
-  BYD: 'Kujawy: spokojnie, sporo średnich zleceń.',
-  LUB: 'Wschód: mniej konkurencji, ale daleko do wszystkiego.',
-  KTW: 'Śląsk: przemysł, węgiel i ładunki na każdą okazję.',
-  BIA: 'Podlasie: cisza, żubry i długie dojazdy na pusto.',
-  RZE: 'Podkarpacie: A4 na wschód, mało kto tu konkuruje.',
-};
+/** Plusy i minusy siedziby jako krótkie etykiety (liczby z data/hq.ts). */
+function hqTraits(id: string): { text: string; good: boolean }[] {
+  const h = hqProfile(id);
+  const pctf = (m: number) => `${m > 1 ? '+' : '−'}${Math.round(Math.abs(m - 1) * 100)}%`;
+  const out: { text: string; good: boolean }[] = [];
+  if (h.market !== 0) out.push({ text: `oferty na giełdzie ${h.market > 0 ? '+' : '−'}${Math.abs(h.market)}`, good: h.market > 0 });
+  if (Math.abs(h.localRate - 1) >= 0.01) out.push({ text: `stawki z siedziby ${pctf(h.localRate)}`, good: h.localRate > 1 });
+  if (Math.abs(h.salaryMul - 1) >= 0.01) out.push({ text: `pensje ${pctf(h.salaryMul)}`, good: h.salaryMul < 1 });
+  if (Math.abs(h.landMul - 1) >= 0.01) out.push({ text: `rozbudowa bazy ${pctf(h.landMul)}`, good: h.landMul < 1 });
+  if (h.grant > 0) out.push({ text: `dotacja ${pln(h.grant)}`, good: true });
+  return out;
+}
 
 const TRUCK_TAGS = ['Najtańsza rata', 'Środek stawki', 'Najwyższa rata'];
 const DRIVER_TAGS = ['Najtańszy, do wychowania', 'Złoty środek', 'Najlepszy z ogłoszeń'];
@@ -64,11 +62,17 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    void sim.setupOptions().then((o) => {
+    void sim.setupOptions(undefined, 'WAW').then((o) => {
       setOpts(o);
       setName(o.names[0]);
     });
   }, []);
+  // Pensje kandydatów zależą od lokalnego rynku pracy: po zmianie siedziby przeliczamy propozycje.
+  useEffect(() => {
+    if (!opts) return;
+    void sim.setupOptions(opts.seed, hq).then((o) => setOpts((prev) => (prev ? { ...o, names: prev.names } : o)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hq]);
 
   if (!opts) return <div className="loading">Zdzisiek szuka długopisu…</div>;
   const truck = opts.trucks[truckIdx];
@@ -120,8 +124,8 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
           {step === 1 && (
             <>
               <p className="muted">
-                W siedzibie odbierasz auta z salonu i stąd częściej startują zlecenia, bo miejscowi klienci Cię znają. Kropki pokazują, ile jest
-                zleceń w okolicy.
+                W siedzibie odbierasz auta z salonu i stąd częściej startują zlecenia, bo miejscowi klienci Cię znają. Kropki pokazują ruch w
+                regionie. Duże miasto to więcej ofert, ale też droższa baza, wyższe pensje i konkurencja. Na prowincji odwrotnie.
               </p>
               <div className="setup-grid cities" role="radiogroup" aria-label="Siedziba">
                 {CITIES.map((c) => (
@@ -134,7 +138,14 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
                         ))}
                       </span>
                     </span>
-                    <span className="muted opt-desc">{CITY_BLURB[c.id]}</span>
+                    <span className="muted opt-desc">{hqProfile(c.id).blurb}</span>
+                    <span className="hq-traits">
+                      {hqTraits(c.id).map((t) => (
+                        <span key={t.text} className={`fc-trait ${t.good ? 'good' : 'bad'}`}>
+                          {t.text}
+                        </span>
+                      ))}
+                    </span>
                   </Option>
                 ))}
               </div>
@@ -190,7 +201,8 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
                 ))}
               </div>
               <p className="setup-summary">
-                <strong>{name.trim()}</strong>, siedziba: {CITIES.find((c) => c.id === hq)?.name}. Start z <strong className="num">{pln(BALANCE.startCash)}</strong>,
+                <strong>{name.trim()}</strong>, siedziba: {CITIES.find((c) => c.id === hq)?.name}. Start z <strong className="num">{pln(BALANCE.startCash + hqProfile(hq).grant)}</strong>
+                {hqProfile(hq).grant > 0 ? ' (z dotacją)' : ''},
                 koszty stałe <strong className="num">{pln(daily)}</strong> na dobę (rata {pln(truck.leasePerDay)} + pensja {pln(driver.salaryPerDay)}).
                 {driverScore(driver) >= 70 && ' Rutyniarz kosztuje, ale szybko się zwraca.'}
               </p>

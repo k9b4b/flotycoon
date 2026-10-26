@@ -3,7 +3,7 @@ import { CITY_BY_ID } from '../data/cities';
 import { kmAt, phaseAt } from './drivingRules';
 import { ROAD_EVENT_BY_ID, eventCtx, optionHint, optionLabel } from './roadEvents';
 import { RANKS, UPGRADES, YARD, type Upgrade } from '../data/progression';
-import { driverCap, driverOfTruck, fleetCap, isAvailable, previewJob, rankIndex, serviceQuote, truckOfDriver, upgradesPerDay, type JobPreview } from './sim';
+import { buildCost, driverCap, driverOfTruck, fleetCap, isAvailable, previewJob, rankIndex, serviceQuote, truckOfDriver, upgradesPerDay, type JobPreview } from './sim';
 import { maxContracts } from './contracts';
 import type { BaseState, Contract, ContractOffer, DayRecord, Driver, GameState, Job, LogEntry, Phase, PhaseKind, Truck, TruckOffer } from './types';
 
@@ -249,8 +249,8 @@ function companyView(s: GameState): CompanyView {
     yardName: YARD[s.base.yard].name,
     fleetCap: fleetCap(s),
     driverCap: driverCap(s),
-    nextYard: ny ? { name: ny.name, cap: ny.cap, cost: ny.cost, unlocked: rank >= ny.rank, rankName: RANKS[ny.rank].name } : null,
-    upgrades: UPGRADES.map((u) => ({ ...u, owned: s.base[u.id], unlocked: rank >= u.rank })),
+    nextYard: ny ? { name: ny.name, cap: ny.cap, cost: buildCost(s, ny.cost), unlocked: rank >= ny.rank, rankName: RANKS[ny.rank].name } : null,
+    upgrades: UPGRADES.map((u) => ({ ...u, cost: buildCost(s, u.cost), owned: s.base[u.id], unlocked: rank >= u.rank })),
     upkeepPerDay: upgradesPerDay(s),
   };
 }

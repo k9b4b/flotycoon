@@ -79,7 +79,7 @@ const api: SimApi = {
     pushSnapshot();
     return { report, saving, needsSetup: false };
   },
-  setupOptions: (seed) => E.setupOptions(seed ?? ((Math.random() * 2 ** 31) | 0)),
+  setupOptions: (seed, hq) => E.setupOptions(seed ?? ((Math.random() * 2 ** 31) | 0), hq),
   abandonGame() {
     state = null;
   },

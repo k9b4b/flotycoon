@@ -8,7 +8,7 @@ import type { CourseId } from '../data/development';
 export interface SimApi {
   /** needsSetup: brak zapisu, gracz najpierw przechodzi kreator firmy. */
   init(): Promise<{ report: CatchUpReport | null; saving: boolean; needsSetup: boolean }>;
-  setupOptions(seed?: number): SetupOptions;
+  setupOptions(seed?: number, hqCityId?: string): SetupOptions;
   startGame(setup: GameSetup): Promise<void>;
   /** Porzuca obecną firmę (zapis zostaje, dopóki nowa nie wystartuje). */
   abandonGame(): void;

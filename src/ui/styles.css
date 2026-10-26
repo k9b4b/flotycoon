@@ -837,3 +837,6 @@ select {
   .setup-foot { position: sticky; bottom: 0; background: var(--panel); }
 }
 .help-confirm { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+.hq-traits { display: flex; flex-wrap: wrap; gap: 4px; }
+.hq-traits .fc-trait { font-size: 10.5px; padding: 1px 6px; }
+.setup-option { -webkit-tap-highlight-color: transparent; }

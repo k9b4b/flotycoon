@@ -1,6 +1,7 @@
 import { BALANCE } from '../data/balance';
 import { HOME_BASE } from '../data/cities';
 import { FEMALE_NAMES, LAST_NAMES, MALE_NAMES, NICKNAMES, QUIRKS, TRUCK_MODELS } from '../data/flavor';
+import { hqProfile } from '../data/hq';
 import { PERKS, PERK_BY_ID, PERK_SALARY, type PerkId } from '../data/perks';
 import { EXTRA_DRIVERS, MARKETS, RANKS, UPGRADES, WORKSHOP, YARD, type UpgradeId } from '../data/progression';
 import { driverName, fmtPLN, g, log, newId, spend, type ActionResult } from './core';
@@ -96,7 +97,8 @@ export function generateDriver(s: GameState, prefix = 'd'): Driver {
     quirk: pick(r, QUIRKS),
     stats,
     perks,
-    salaryPerDay: Math.round(300 + quality * 2.6 + perkPay + randInt(r, 0, 40)),
+    // Lokalny rynek pracy: w stolicy drożej, na wschodzie taniej.
+    salaryPerDay: Math.round((300 + quality * 2.6 + perkPay + randInt(r, 0, 40)) * hqProfile(s.hqCityId).salaryMul),
     hiredAt: s.now,
     kmDriven: 0,
     jobsDone: 0,
@@ -258,12 +260,16 @@ export function returnTruck(s: GameState, truckId: string): ActionResult {
 
 // ─── Akcje gracza: baza ─────────────────────────────────────────────────────
 
+/** Koszt budowy w siedzibie (ceny gruntu). Dyspozytorka to pensja, nie budowa, więc jej nie dotyczy. */
+export const buildCost = (s: GameState, base: number) => Math.round((base * hqProfile(s.hqCityId).landMul) / 100) * 100;
+
 export function upgradeYard(s: GameState): ActionResult {
   const next = YARD[s.base.yard + 1];
   if (!next) return { ok: false, error: 'Większego placu w okolicy nie ma.' };
   if (rankIndex(s.reputation) < next.rank) return { ok: false, error: `Wymaga rangi „${RANKS[next.rank].name}”.` };
-  if (s.cash < next.cost) return { ok: false, error: `${next.name} kosztuje ${fmtPLN(next.cost)}.` };
-  spend(s, next.cost, 'fleet');
+  const cost = buildCost(s, next.cost);
+  if (s.cash < cost) return { ok: false, error: `${next.name} kosztuje ${fmtPLN(cost)}.` };
+  spend(s, cost, 'fleet');
   s.base.yard += 1;
   const msg = `${next.name}: miejsce na ${next.cap} aut. Szwagier w końcu odzyskał swoje podwórko.`;
   log(s, 'good', msg);
@@ -275,8 +281,9 @@ export function buyUpgrade(s: GameState, id: UpgradeId): ActionResult {
   if (!u) return { ok: false, error: 'Nieznane ulepszenie.' };
   if (s.base[id]) return { ok: false, error: `${u.name} już jest.` };
   if (rankIndex(s.reputation) < u.rank) return { ok: false, error: `Wymaga rangi „${RANKS[u.rank].name}”.` };
-  if (s.cash < u.cost) return { ok: false, error: `${u.name} kosztuje ${fmtPLN(u.cost)}.` };
-  spend(s, u.cost, 'fleet');
+  const cost = buildCost(s, u.cost);
+  if (s.cash < cost) return { ok: false, error: `${u.name} kosztuje ${fmtPLN(cost)}.` };
+  spend(s, cost, 'fleet');
   s.base[id] = true;
   if (id === 'dispatcher') {
     s.base.autoDispatch = true;

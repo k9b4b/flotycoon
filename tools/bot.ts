@@ -5,6 +5,7 @@
 import { RANKS, UPGRADES, YARD } from '../src/data/progression';
 import {
   acceptJob,
+  buildCost,
   activeContracts,
   assignDriver,
   maxContracts,
@@ -43,10 +44,10 @@ export function botTick(s: GameState, opts: { grow?: boolean } = {}) {
   const rank = rankIndex(s.reputation);
   // Inwestycje w bazę, gdy stać i ranga pozwala.
   const nextYard = YARD[s.base.yard + 1];
-  if (nextYard && rank >= nextYard.rank && s.trucks.length >= fleetCap(s) && s.cash > nextYard.cost + 10_000 + fixedPerDay(s) * 7) upgradeYard(s);
+  if (nextYard && rank >= nextYard.rank && s.trucks.length >= fleetCap(s) && s.cash > buildCost(s, nextYard.cost) + 10_000 + fixedPerDay(s) * 7) upgradeYard(s);
   for (const u of UPGRADES) {
     if (u.id === 'dispatcher') continue; // bot sam przydziela, dyspozytor by go tylko kosztował
-    if (!s.base[u.id] && rank >= u.rank && s.cash > u.cost + reserve * 2) buyUpgrade(s, u.id);
+    if (!s.base[u.id] && rank >= u.rank && s.cash > buildCost(s, u.cost) + reserve * 2) buyUpgrade(s, u.id);
   }
   // Nowe auto + kierowca, gdy jest zapas na ~2 tygodnie kosztów stałych.
   if (s.trucks.length < fleetCap(s) && s.drivers.length < driverCap(s) && s.cash > reserve) {

@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { BALANCE } from '../../data/balance';
 import { PERK_BY_ID } from '../../data/perks';
 import type { Driver } from '../../engine/types';
 import { STAT_LABELS } from '../format';
@@ -69,11 +71,52 @@ export function PerkList({ d }: { d: Driver }) {
   );
 }
 
+/** Co daje każda statystyka. Liczby zgodne z engine/effects.ts. */
+export const STAT_INFO: Record<string, string> = {
+  experience: 'Średnia prędkość: od −7% do +5% względem prędkości bazowej. Rośnie z każdym przejechanym kilometrem.',
+  eco: 'Spalanie: od +12% przy zerze do −10% przy setce. Paliwo to największy koszt kursu.',
+  reliability: 'Szansa, że kontrola ITD skończy się mandatem (i utratą reputacji). Pomaga też, gdy na kontroli giną papiery.',
+  stamina: 'Ryzyko, że kierowca zaśpi i przedłuży odpoczynek na trasach powyżej 250 km. Ważna też, gdy na trasie kleją się oczy.',
+  morale: `Mnoży niezawodność: przy zerowym morale kierowca działa na 70% swojej niezawodności. Rośnie po terminowych kursach i premii, spada po spóźnieniach i bez pracy, a z czasem wraca do ok. ${BALANCE.moraleBaseline} (perki mogą to przesunąć).`,
+};
+
 export function StatBars({ d, skipMorale = false }: { d: Driver; skipMorale?: boolean }) {
+  const [info, setInfo] = useState(false);
+  const keys = Object.keys(d.stats).filter((k) => !(skipMorale && k === 'morale'));
   return (
     <div className="fc-stats">
+      <div className="fc-stats-head">
+        <span className="muted">Statystyki</span>
+        <button
+          type="button"
+          className={`info-btn${info ? ' on' : ''}`}
+          aria-expanded={info}
+          aria-label="Co oznaczają statystyki"
+          title="Co oznaczają statystyki"
+          onClick={(e) => {
+            e.stopPropagation();
+            setInfo(!info);
+          }}
+        >
+          i
+        </button>
+      </div>
+      {info && (
+        <dl className="stat-info" onClick={(e) => e.stopPropagation()}>
+          {keys.map((k) => (
+            <div key={k}>
+              <dt>{STAT_LABELS[k]}</dt>
+              <dd className="muted">{STAT_INFO[k]}</dd>
+            </div>
+          ))}
+          <div>
+            <dt>Ocena</dt>
+            <dd className="muted">Liczba w kółku przy nazwisku: średnia doświadczenia, eco-drivingu, niezawodności i kondycji (bez morale, bo ono się zmienia).</dd>
+          </div>
+        </dl>
+      )}
       {Object.entries(d.stats)
-        .filter(([k]) => !(skipMorale && k === 'morale'))
+        .filter(([k]) => keys.includes(k))
         .map(([k, v]) => (
           <div className="fc-stat" key={k}>
             <span className="fc-stat-name">{STAT_LABELS[k]}</span>

@@ -144,10 +144,6 @@ function Details({ t, snap, a }: { t: TruckView; snap: Snapshot; a: FleetActions
           <StatBars d={d} />
           <PerkList d={d} />
           <div className="fc-morale">
-            <span className="muted">
-              Morale mnoży niezawodność: im niższe, tym częściej kierowca wpada na kontroli ITD. Rośnie przy terminowych kursach, spada przy
-              spóźnieniach i bezczynności, a z czasem wraca do normy.
-            </span>
             <button className="btn small" disabled={now < bonusAt} onClick={() => a.bonus(d.id)} title={now < bonusAt ? `Następna premia od ${formatGameTime(bonusAt)}` : undefined}>
               {now < bonusAt ? `Premia od ${formatGameTime(bonusAt)}` : `Premia ${pln(BALANCE.bonusCost)} · morale +${BALANCE.bonusMorale}`}
             </button>

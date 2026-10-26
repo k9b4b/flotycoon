@@ -629,3 +629,24 @@ select {
 .dec-delegate { align-self: flex-start; }
 .clock .label.warn { color: var(--accent); font-weight: 600; }
 .dec-tag { margin-left: 8px; font-style: normal; font-size: 11px; font-weight: 600; color: var(--accent); }
+
+/* Przycisk „i” przy statystykach */
+.fc-stats-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
+.info-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: var(--panel-2);
+  color: var(--muted);
+  font: italic 700 12px/1 Georgia, 'Times New Roman', serif;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.info-btn:hover, .info-btn.on { color: var(--accent); border-color: var(--accent); }
+.stat-info { margin: 0 0 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
+.stat-info dt { font-weight: 600; }
+.stat-info dd { margin: 2px 0 0; line-height: 1.4; }

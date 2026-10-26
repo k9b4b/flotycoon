@@ -172,6 +172,7 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
   font-weight: 600;
   white-space: nowrap;
 }
+.badge.warn { color: var(--accent); }
 .btn:hover:not(:disabled) { border-color: var(--accent); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }

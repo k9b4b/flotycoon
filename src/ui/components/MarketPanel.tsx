@@ -24,8 +24,9 @@ export function MarketPanel({
     if (!active) return b.payment - a.payment;
     const pa = a.previews.find((p) => p.truckId === active.truck.id);
     const pb = b.previews.find((p) => p.truckId === active.truck.id);
-    // Najpierw wykonalne na czas, potem zysk na godzinę.
-    const score = (p?: (typeof a.previews)[number]) => (p ? (p.onTime && !p.tooFar ? 1e6 : 0) + p.profit / Math.max(60, p.durationMin) : 0);
+    // Najpierw bezpieczne, potem „na styk”, na końcu niewykonalne; w grupie wg zysku na godzinę.
+    const score = (p?: (typeof a.previews)[number]) =>
+      p ? (p.onTime && !p.tooFar ? (p.tight ? 1e6 : 2e6) : 0) + p.profit / Math.max(60, p.durationMin) : 0;
     return score(pb) - score(pa);
   });
 
@@ -93,8 +94,12 @@ export function MarketPanel({
                       <span className="badge bad">za daleko</span>
                     ) : !p.onTime ? (
                       <span className="badge bad">nie zdąży</span>
+                    ) : p.tight ? (
+                      <span className="badge warn" title="Mały zapas: korek albo kontrola mogą spowodować spóźnienie">
+                        na styk · zapas {formatDuration(p.bufferMin)}
+                      </span>
                     ) : (
-                      <span className="badge good">na czas</span>
+                      <span className="badge good">zapas {formatDuration(p.bufferMin)}</span>
                     )}
                   </>
                 )}

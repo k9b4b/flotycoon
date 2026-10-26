@@ -1,3 +1,4 @@
+import { BALANCE } from '../data/balance';
 import { CITY_BY_ID } from '../data/cities';
 import { kmAt, phaseAt } from './drivingRules';
 import { isAvailable, previewJob, serviceQuote, type JobPreview } from './sim';
@@ -51,7 +52,12 @@ export interface TruckView {
     startedAt: number;
     emptyKm: number;
     jobKm: number;
+    /** Prawdziwy harmonogram (ruch na mapie). */
     phases: Pick<Phase, 'kind' | 'start' | 'end' | 'km0' | 'km1'>[];
+    /** Plan znany dyspozytorowi (bez przyszłych zdarzeń): oś czasu i ETA. */
+    plan: Pick<Phase, 'kind' | 'start' | 'end'>[];
+    /** Po terminie, ale w tolerancji klienta. */
+    tight: boolean;
   };
 }
 
@@ -71,6 +77,24 @@ export interface Snapshot {
   totals: GameState['totals'];
   costsByCategory: GameState['costsByCategory'];
   dailyFixedCosts: number;
+}
+
+/**
+ * Plan kursu taki, jaki zna dyspozytor: zdarzenia, które jeszcze nie nastąpiły, są ukryte,
+ * a kolejne fazy przesunięte o ich czas. Gra nie zdradza przyszłego korka.
+ * Ruch ciężarówki na mapie nadal idzie po prawdziwym harmonogramie.
+ */
+export function plannedPhases(phases: Phase[], now: number): Phase[] {
+  const out: Phase[] = [];
+  let shift = 0;
+  for (const p of phases) {
+    if (p.kind === 'incident' && p.start > now) {
+      shift += p.end - p.start;
+      continue;
+    }
+    out.push(shift ? { ...p, start: p.start - shift, end: p.end - shift } : p);
+  }
+  return out;
 }
 
 function lerp(a: number, b: number, f: number) {
@@ -112,6 +136,8 @@ function truckView(s: GameState, truck: Truck, fleetNo: number): TruckView {
   }
   const phase = phaseAt(trip.phases, s.now);
   const status = phase?.kind ?? 'unload';
+  const plan = plannedPhases(trip.phases, s.now);
+  const eta = plan[plan.length - 1].end;
   return {
     ...base,
     status,
@@ -125,15 +151,17 @@ function truckView(s: GameState, truck: Truck, fleetNo: number): TruckView {
       originId: trip.originId,
       cargo: trip.job.cargo,
       progress: total > 0 ? km / total : 1,
-      eta: trip.eta,
+      eta,
       deadline: trip.job.deadline,
-      late: trip.eta > trip.job.deadline,
+      late: eta > trip.job.deadline + BALANCE.lateGraceMin,
+      tight: eta > trip.job.deadline && eta <= trip.job.deadline + BALANCE.lateGraceMin,
       phaseEnd: phase?.end ?? trip.eta,
       incidentText: phase?.incident?.text,
       startedAt: trip.startedAt,
       emptyKm: trip.emptyKm,
       jobKm: trip.job.km,
       phases: trip.phases.map((p) => ({ kind: p.kind, start: p.start, end: p.end, km0: p.km0, km1: p.km1 })),
+      plan: plan.map((p) => ({ kind: p.kind, start: p.start, end: p.end })),
     },
   };
 }

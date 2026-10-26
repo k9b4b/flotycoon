@@ -35,6 +35,10 @@ export const BALANCE = {
   leaseDeposit: 6_000,
   maxFleet: 25,
   lateMoraleHit: 5,
+  /** Tolerancja klienta: spóźnienie do tylu minut przechodzi bez kary. */
+  lateGraceMin: 60,
+  /** Poniżej takiego zapasu czasu giełda ostrzega „na styk”. */
+  tightBufferMin: 120,
   onTimeMoraleGain: 2,
   idleMoraleDrift: -1,
 

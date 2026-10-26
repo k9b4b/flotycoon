@@ -82,7 +82,7 @@ function TripTimeline({ t, now }: { t?: TruckView; now: number }) {
       </div>
     );
   }
-  const { phases, startedAt, eta, deadline } = t.trip;
+  const { plan: phases, startedAt, eta, deadline } = t.trip;
   const end = Math.max(eta, deadline);
   const span = Math.max(1, end - startedAt);
   const pos = (v: number) => `${((v - startedAt) / span) * 100}%`;
@@ -163,7 +163,15 @@ function PreviewCard({
           {p.emptyKm > 0 && <span className="muted">dojazd {km(p.emptyKm)}</span>}
           <span className="muted">ETA {formatGameTime(p.eta)}</span>
           <span className={p.profit >= 0 ? 'good num' : 'bad num'}>{plnSigned(p.profit)}</span>
-          {p.tooFar ? <span className="badge bad">za daleko</span> : !p.onTime ? <span className="badge bad">nie zdąży</span> : <span className="badge good">na czas</span>}
+          {p.tooFar ? <span className="badge bad">za daleko</span> : !p.onTime ? (
+                      <span className="badge bad">nie zdąży</span>
+                    ) : p.tight ? (
+                      <span className="badge warn" title="Mały zapas: korek albo kontrola mogą spowodować spóźnienie">
+                        na styk · zapas {formatDuration(p.bufferMin)}
+                      </span>
+                    ) : (
+                      <span className="badge good">zapas {formatDuration(p.bufferMin)}</span>
+                    )}
         </div>
       ) : (
         <div className="bad" style={{ fontSize: 12 }}>

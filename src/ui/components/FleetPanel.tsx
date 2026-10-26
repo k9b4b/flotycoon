@@ -98,7 +98,15 @@ function StatusBlock({ t, now, onFindJob, onService }: { t: TruckView; now: numb
         <strong>
           {city(trip.fromId)} → {city(trip.toId)}
         </strong>
-        <span className={trip.late ? 'badge bad' : 'badge good'}>{trip.late ? 'spóźni się' : 'na czas'}</span>
+        {trip.late ? (
+          <span className="badge bad">spóźni się</span>
+        ) : trip.tight ? (
+          <span className="badge warn" title="Po terminie, ale w godzinnej tolerancji klienta">
+            lekko po terminie
+          </span>
+        ) : (
+          <span className="badge good">na czas</span>
+        )}
       </div>
       <div className="progress">
         <div style={{ width: pct(trip.progress) }} />

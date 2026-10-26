@@ -113,7 +113,7 @@ function generateJob(s: GameState): Job {
   const payment = Math.round((km * ratePerKm * shortBonus) / 10) * 10;
   const driveH = km / BALANCE.baseSpeedKmh;
   const estMin = (driveH + Math.floor(driveH / 4.5) * 0.75 + Math.floor(driveH / 9) * 11) * 60 + BALANCE.loadMin + BALANCE.unloadMin;
-  const slack = urgent ? randRange(r, 1.05, 1.25) : randRange(r, 1.3, 2.2);
+  const slack = urgent ? randRange(r, 1.1, 1.3) : randRange(r, 1.35, 2.2);
   return {
     id: newId(s, 'j'),
     fromId,
@@ -123,7 +123,7 @@ function generateJob(s: GameState): Job {
     weightT: randInt(r, cargo.minT, cargo.maxT),
     km,
     payment,
-    deadline: Math.round(s.now + 120 + estMin * slack),
+    deadline: Math.round(s.now + 180 + estMin * slack),
     penaltyPerHour: Math.round((payment * randRange(r, 0.03, 0.06)) / 10) * 10,
     postedAt: s.now,
     expiresAt: s.now + randInt(r, BALANCE.jobLifetimeMin[0], BALANCE.jobLifetimeMin[1]),
@@ -184,6 +184,10 @@ export interface JobPreview {
   tollCost: number;
   profit: number;
   onTime: boolean;
+  /** Zapas czasu do terminu przy planie bez zdarzeń (minuty, ujemny = nie zdąży). */
+  bufferMin: number;
+  /** Na czas, ale z małym zapasem: korek albo kontrola mogą przesądzić. */
+  tight: boolean;
   tooFar: boolean;
 }
 
@@ -210,6 +214,8 @@ export function previewJob(s: GameState, job: Job, truck: Truck): JobPreview {
     tollCost,
     profit: job.payment - fuelCost - tollCost,
     onTime: eta <= job.deadline,
+    bufferMin: job.deadline - eta,
+    tight: eta <= job.deadline && job.deadline - eta < BALANCE.tightBufferMin,
     tooFar: emptyKm > BALANCE.maxEmptyRunKm,
   };
 }
@@ -317,7 +323,9 @@ function onTripDone(s: GameState, tripId: string) {
   const driver = s.drivers.find((d) => d.id === trip.driverId)!;
   const job = trip.job;
   const totalKm = trip.emptyKm + job.km;
-  const lateMin = Math.max(0, trip.eta - job.deadline);
+  const overMin = Math.max(0, trip.eta - job.deadline);
+  // Do godziny po terminie klient zwykle przymyka oko; kara liczy się od pierwszej minuty po tolerancji.
+  const lateMin = overMin > BALANCE.lateGraceMin ? overMin : 0;
   const penalty = lateMin > 0 ? Math.min(job.payment * 0.5, Math.ceil(lateMin / 60) * job.penaltyPerHour) : 0;
 
   earn(s, job.payment - penalty);
@@ -345,6 +353,8 @@ function onTripDone(s: GameState, tripId: string) {
     driver.lateJobs += 1;
     s.totals.lateJobs += 1;
     log(s, 'bad', `${driver.nickname} spóźnił${g(driver)} się ${formatDuration(lateMin)} do ${city}. Kara ${fmtPLN(penalty)}. „Korki były”. Na czysto: ${fmtPLN(net)}.`);
+  } else if (overMin > 0) {
+    log(s, 'funny', `${driver.nickname} ${driver.female ? 'dojechała' : 'dojechał'} do ${city} ${formatDuration(overMin)} po terminie. Magazynier westchnął, ale podpisał bez kary. Na czysto: ${fmtPLN(net)}.`);
   } else {
     log(s, 'good', `${driver.nickname} ${driver.female ? 'dowiozła' : 'dowiózł'} do ${city}: ${job.cargo.toLowerCase()}. Fracht ${fmtPLN(job.payment)}, paliwo i myto ${fmtPLN(trip.fuelCost + trip.tollCost)}. Na czysto: ${fmtPLN(net)}.`);
   }

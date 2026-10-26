@@ -117,3 +117,31 @@ describe('symulacja', () => {
     expect(s.days.length).toBeGreaterThanOrEqual(6);
   });
 });
+
+describe('spóźnienia', () => {
+  it('plan dyspozytora ukrywa zdarzenia, które jeszcze nie nastąpiły', async () => {
+    const { plannedPhases } = await import('../src/engine/view');
+    const info = { kind: 'traffic' as const, text: 'korek', cost: 0, tone: 'funny' as const };
+    const { phases } = planTrip(0, [{ kind: 'drive', km: 200 }], 60, [{ atKm: 100, min: 90, info }]);
+    const realEnd = phases[phases.length - 1].end;
+    const before = plannedPhases(phases, 10);
+    expect(before.some((p) => p.kind === 'incident')).toBe(false);
+    expect(before[before.length - 1].end).toBe(realEnd - 90);
+    // Po wystąpieniu zdarzenia plan zgadza się z rzeczywistością.
+    const inc = phases.find((p) => p.kind === 'incident')!;
+    const after = plannedPhases(phases, inc.start + 1);
+    expect(after[after.length - 1].end).toBe(realEnd);
+  });
+
+  it('do godziny po terminie klient nie nalicza kary', () => {
+    const s = newGame(11);
+    const truck = s.trucks[0];
+    const job = s.market.find((j) => previewJob(s, j, truck).emptyKm === 0) ?? s.market[0];
+    expect(acceptJob(s, job.id, truck.id).ok).toBe(true);
+    const trip = s.trips[truck.tripId!];
+    trip.job.deadline = trip.eta - 30; // 30 min po terminie
+    advanceTo(s, trip.eta + 1);
+    expect(s.totals.penalties).toBe(0);
+    expect(s.totals.lateJobs).toBe(0);
+  });
+});

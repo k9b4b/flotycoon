@@ -44,7 +44,7 @@ export function rollIncidents(r: RngState, truck: Truck, d: Driver, totalKm: num
   const longTrip = Math.min(1.5, totalKm / 350);
 
   if (chance(r, 0.3 * longTrip)) {
-    out.push({ atKm: at(), min: randInt(r, 30, 150), info: { kind: 'traffic', text: fill(pick(r, INCIDENTS.traffic), d), cost: 0, tone: 'funny' } });
+    out.push({ atKm: at(), min: randInt(r, 20, 100), info: { kind: 'traffic', text: fill(pick(r, INCIDENTS.traffic), d), cost: 0, tone: 'funny' } });
   }
   if (chance(r, (0.02 + truck.wear * truck.wear * 0.35) * longTrip)) {
     const cost = Math.round(randInt(r, 600, 2800) * (1 + truck.wear));

@@ -103,7 +103,9 @@ export function MarketPanel({
                 {p && (
                   <>
                     {p.emptyKm > 0 && <span className="muted">dojazd {km(p.emptyKm)}</span>}
-                    <span className="muted">ETA {formatGameTime(p.eta)}</span>
+                    <span className="muted" title={`Czas kursu z dojazdem i przerwami. Dostawa ${formatGameTime(p.eta)}`}>
+                      🚚 {formatDuration(p.durationMin)}
+                    </span>
                     {p.restMin > 0 && (
                       <span className="muted" title="Kierowca wyczerpał dzienny limit jazdy i musi odpocząć (tachograf)">
                         w tym odpoczynek {formatDuration(p.restMin)}
@@ -129,7 +131,9 @@ export function MarketPanel({
               {open && (
                 <div className="job-actions">
                   {!active && <span className="muted">Wszystkie zestawy w trasie. Przyjąć zlecenie można, gdy któryś się zwolni.</span>}
-                  <span className="muted">termin {formatGameTime(j.deadline)}</span>
+                  <span className="muted">
+                    {p && `dostawa ${formatGameTime(p.eta)} · `}termin {formatGameTime(j.deadline)}
+                  </span>
                   <span style={{ flex: 1 }} />
                   <button
                     className="btn small mobile-only"

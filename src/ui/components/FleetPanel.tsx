@@ -219,6 +219,19 @@ function TruckCard({
   ]
     .filter(Boolean)
     .join(' ');
+  const plateWear = (
+    <>
+      <span className="plate">{truck.plate}</span>
+      <span className="wear-label" title="Zużycie: im wyższe, tym częstsze awarie i wyższe spalanie. Serwis je obniża, ale nie poniżej poziomu wynikającego z przebiegu.">
+        <span className="fc-wear">
+          <span style={{ width: pct(truck.wear), background: wearColor(truck.wear) }} />
+        </span>
+        <span className="num" style={{ color: wearColor(truck.wear) }}>
+          {pct(truck.wear)}
+        </span>
+      </span>
+    </>
+  );
   return (
     <article className={cls} onClick={() => a.select(truck.id)} data-status={t.status}>
       <header className="fc-head">
@@ -244,15 +257,7 @@ function TruckCard({
             <span>
               {truck.brand} {truck.model}
             </span>
-            <span className="plate">{truck.plate}</span>
-            <span className="wear-label" title="Zużycie: im wyższe, tym częstsze awarie i wyższe spalanie. Serwis je obniża, ale nie poniżej poziomu wynikającego z przebiegu.">
-              <span className="fc-wear">
-                <span style={{ width: pct(truck.wear), background: wearColor(truck.wear) }} />
-              </span>
-              <span className="num" style={{ color: wearColor(truck.wear) }}>
-                {pct(truck.wear)}
-              </span>
-            </span>
+            {plateWear}
           </div>
         </div>
         <div className="fc-right">
@@ -261,6 +266,16 @@ function TruckCard({
           {t.status === 'nodriver' && <span className="fc-pill">Bez kierowcy</span>}
         </div>
       </header>
+      {/* Na telefonie auto ma osobny wiersz pod kierowcą, żeby nagłówek nie był ściśnięty. */}
+      <div className="fc-truckrow">
+        <TruckSprite t={truck} />
+        <div className="fc-truckrow-info">
+          <span>
+            {truck.brand} {truck.model}
+          </span>
+          <span className="fc-truckrow-line">{plateWear}</span>
+        </div>
+      </div>
 
       <StatusBlock t={t} snap={snap} a={a} onStaff={onStaff} />
 

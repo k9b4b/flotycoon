@@ -694,3 +694,12 @@ select {
 @media (max-width: 720px) {
   .staff-head.with-avatar .truck-sprite { width: 88px !important; height: 56px !important; }
 }
+
+/* Karta zestawu na telefonie: kierowca w nagłówku, auto w osobnym wierszu. */
+.fc-truckrow { display: none; }
+@media (max-width: 720px) {
+  .fc-head .fc-truck, .fc-head .truck-sprite { display: none; }
+  .fc-truckrow { display: flex; align-items: center; gap: 12px; margin-top: -2px; }
+  .fc-truckrow-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 13px; color: var(--muted); }
+  .fc-truckrow-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+}

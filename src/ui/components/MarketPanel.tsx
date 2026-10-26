@@ -97,8 +97,8 @@ export function MarketPanel({
                 </div>
               </div>
               <div className="calc">
-                <span className="muted" title="Termin dostawy">
-                  ⏱ do {formatGameTime(j.deadline)} ({formatDuration(timeLeft)})
+                <span className="muted" title={`Termin dostawy: ${formatGameTime(j.deadline)}`}>
+                  ⏱ {formatDuration(timeLeft)}
                 </span>
                 {p && (
                   <>
@@ -129,6 +129,7 @@ export function MarketPanel({
               {open && (
                 <div className="job-actions">
                   {!active && <span className="muted">Wszystkie zestawy w trasie. Przyjąć zlecenie można, gdy któryś się zwolni.</span>}
+                  <span className="muted">termin {formatGameTime(j.deadline)}</span>
                   <span style={{ flex: 1 }} />
                   <button
                     className="btn small mobile-only"

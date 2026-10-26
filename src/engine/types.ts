@@ -235,6 +235,17 @@ export interface GameState {
 export interface GameSettings {
   /** true: zdarzenia w trakcie gry zatrzymują zegar i pytają gracza; false: kierowcy decydują sami. */
   askDecisions: boolean;
+  /** Postęp samouczka (pole opcjonalne: starsze zapisy dostają je przy pierwszym uruchomieniu). */
+  tutorial?: TutorialState;
+}
+
+export interface TutorialState {
+  /** Indeks kroku głównego samouczka. */
+  step: number;
+  /** Porady kontekstowe już pokazane. */
+  seen: string[];
+  /** Gracz wyłączył samouczek i porady. */
+  off: boolean;
 }
 
 export interface PendingDecision {

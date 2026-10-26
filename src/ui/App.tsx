@@ -4,6 +4,7 @@ import { SPEED_PRESETS, formatDuration, formatGameTime } from '../engine/time';
 import { CashChart, CostBreakdown } from './components/Charts';
 import { CompanyPanel } from './components/CompanyPanel';
 import { DecisionModal } from './components/DecisionModal';
+import { Coach, HelpSheet } from './components/Tutorial';
 import { FleetPanel } from './components/FleetPanel';
 import { LogPanel } from './components/LogPanel';
 import { MapPanel } from './components/MapPanel';
@@ -27,6 +28,7 @@ export function App() {
   const [tab, setTab] = useState<Tab>('map');
   const [focus, setFocus] = useState<MapFocus | null>(null);
   const [logSeenAt, setLogSeenAt] = useState(0);
+  const [help, setHelp] = useState(false);
 
   useEffect(() => {
     sim.init().then((r) => {
@@ -95,6 +97,9 @@ export function App() {
           <div className="time">{formatGameTime(snap.now, true)}</div>
           <div className={`label${snap.decisions.length ? ' warn' : ''}`}>{snap.decisions.length ? 'czeka na decyzję' : 'czas gry'}</div>
         </div>
+        <button className="help-btn" onClick={() => setHelp(true)} aria-label="Ściągawka i samouczek" title="Ściągawka i samouczek">
+          ?
+        </button>
         <div className="speed" role="group" aria-label="Tempo gry">
           {SPEED_PRESETS.map((s) => (
             <button key={s.id} className={pace === s.pace ? 'on' : ''} onClick={() => void sim.setPace(s.pace)} title={s.pace === 0 ? 'Pauza' : `${s.pace} min gry na sekundę`}>
@@ -220,6 +225,8 @@ export function App() {
       </main>
 
       {mobile && <TabBar tab={tab} onTab={switchTab} badges={badges} />}
+      <Coach snap={snap} pace={pace} mobile={mobile} onTab={switchTab} />
+      {help && <HelpSheet onClose={() => setHelp(false)} />}
       {snap.decisions[0] && (
         <DecisionModal
           d={snap.decisions[0]}

@@ -26,7 +26,7 @@ import { checkMilestones, onTrainingDone } from './training';
 import { ALL_ROAD_EVENTS, ROAD_EVENT_BY_ID, eventCtx, optionLabel, type Outcome } from './roadEvents';
 import { roadKm } from './routes';
 import { MIN_PER_HOUR, dayIndex, formatDuration, formatGameTime, nextMidnight } from './time';
-import { SAVE_VERSION, type Driver, type GameEvent, type GameState, type IncidentInfo, type Job, type PendingDecision, type Phase, type Trip, type Truck } from './types';
+import { SAVE_VERSION, type Driver, type GameEvent, type GameState, type IncidentInfo, type Job, type PendingDecision, type Phase, type Trip, type Truck, type TutorialState } from './types';
 
 // Ponowny eksport, żeby UI, worker i narzędzia miały jedno miejsce importu.
 export { driverName, fmtPLN, g, log, type ActionResult };
@@ -137,7 +137,7 @@ export function newGame(seed: number): GameState {
     base: { yard: 0, workshop: false, office: false, dispatcher: false, autoDispatch: false },
     candidates: [],
     truckOffers: [],
-    settings: { askDecisions: true },
+    settings: { askDecisions: true, tutorial: { step: 0, seen: [], off: false } },
     decisions: [],
     contracts: [],
     contractOffers: [],
@@ -373,6 +373,12 @@ export function setAskDecisions(s: GameState, on: boolean): ActionResult {
   s.settings.askDecisions = on;
   if (!on) autoResolveAll(s);
   return { ok: true, message: on ? 'Kierowcy będą dzwonić z każdą decyzją na trasie.' : 'Kierowcy decydują sami. Szef ma święty spokój (prawie).' };
+}
+
+/** Zapisuje postęp samouczka (bez wpisu w dzienniku). */
+export function setTutorial(s: GameState, t: TutorialState): ActionResult {
+  s.settings.tutorial = { step: t.step, seen: [...t.seen], off: t.off };
+  return { ok: true, message: '' };
 }
 
 const fillDriver = (text: string, d: Driver) => text.replaceAll('{nick}', d.nickname).replaceAll('{a}', g(d));

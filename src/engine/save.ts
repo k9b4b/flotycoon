@@ -64,5 +64,7 @@ export function migrate(raw: any): GameState | null {
   if (s.version !== SAVE_VERSION) return null;
   // Uzupełnienia pól dodanych bez podbijania wersji (bezpieczne domyślne wartości).
   s.costsByCategory = { bonuses: 0, base: 0, training: 0, ...s.costsByCategory };
+  // Starsze zapisy: kto już trochę pograł, nie dostaje samouczka od zera (porady zostają).
+  if (!s.settings.tutorial) s.settings.tutorial = { step: (s.totals?.jobsDone ?? 0) > 5 ? 99 : 0, seen: [], off: false };
   return s as GameState;
 }

@@ -16,6 +16,10 @@ npm run build      # typecheck + build produkcyjny do dist/
 
 Gra jest wystawiona na GitHub Pages: **https://k9b4b.github.io/flotycoon/** (działa na telefonie i komputerze, bez logowania). Workflow `.github/workflows/pages.yml` buduje ją przy każdym pushu na `main`. Zapis gry trzyma przeglądarka, więc każdy gracz ma swoją firmę.
 
+## Samouczek
+
+Nową grę prowadzi Zdzisiek, stary spedytor (`ui/components/Tutorial.tsx`): 8 kroków przez pierwszy kurs (giełda, zapas, „Bierzemy”, tempo gry, mapa, ładunek powrotny, flota, cel). Kroki przechodzą same, gdy gracz zrobi to, o co chodzi, a element jest podświetlony (na telefonie gra sama przełącza zakładkę). Potem Zdzisiek wpada z jedną radą naraz, gdy dzieje się coś nowego: telefon od kierowcy, pierwsze spóźnienie, stać nas na drugie auto, auto bez kierowcy, długi postój, zużycie, morale, awans i kontrakty, pełny plac, szkolenia. Pod „?” w górnym pasku jest ściągawka i ponowne uruchomienie samouczka. Postęp jest częścią zapisu gry.
+
 ## Architektura
 
 ```

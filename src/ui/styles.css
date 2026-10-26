@@ -731,3 +731,62 @@ select {
 .course-foot .muted:first-child { flex: 1; }
 .course-note { margin: 0; font-size: 12px; }
 .contract-card .fc-driver strong { display: block; }
+
+/* Samouczek: Zdzisiek */
+.coach {
+  position: fixed;
+  left: max(16px, env(safe-area-inset-left, 0px));
+  bottom: 20px;
+  z-index: 45;
+  width: min(420px, calc(100vw - 32px));
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+.coach.over-modal { z-index: 60; bottom: auto; top: 12px; }
+.coach-face { flex: none; }
+.coach-body { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.coach-head { display: flex; gap: 8px; align-items: baseline; font-size: 12px; }
+.coach-head strong { font-size: 14px; }
+.coach-text { margin: 0; font-size: 13px; line-height: 1.45; }
+.coach-text .good { color: var(--good); }
+.coach-text .warn { color: var(--accent); }
+.coach-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.coach-wait { font-size: 12px; font-style: italic; }
+.btn.ghost { background: none; border-color: transparent; color: var(--muted); }
+.btn.ghost:hover { color: var(--text); }
+.tut-target { outline: 2px solid var(--accent) !important; outline-offset: 3px; border-radius: 8px; animation: tut-pulse 1.6s ease-in-out infinite; position: relative; z-index: 1; }
+@keyframes tut-pulse { 0%, 100% { outline-color: var(--accent); } 50% { outline-color: rgba(245, 165, 36, 0.25); } }
+@media (prefers-reduced-motion: reduce) { .tut-target { animation: none; } }
+.help-btn {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: var(--panel-2);
+  color: var(--text);
+  font: 700 15px/1 inherit;
+  cursor: pointer;
+}
+.help-btn:hover { border-color: var(--accent); color: var(--accent); }
+.modal.help { gap: 8px; }
+.help-head { display: flex; align-items: center; gap: 10px; }
+.help-head h2 { flex: 1; margin: 0; font-size: 18px; }
+.modal.help details { border-top: 1px solid var(--line); padding: 8px 0 2px; }
+.modal.help summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.modal.help details p { margin: 6px 0 4px; font-size: 13px; line-height: 1.45; }
+@media (max-width: 720px) {
+  .coach { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); left: 12px; right: 12px; width: auto; }
+}
+@media (max-width: 720px) {
+  /* „?” w jednym rzędzie z tempem gry, żeby nie zajmował osobnej linii. */
+  .topbar .help-btn { grid-column: 1; grid-row: 2; }
+  .topbar .speed { grid-column: 1 / -1; grid-row: 2; margin-left: 42px; min-width: 0; width: auto; }
+}

@@ -15,13 +15,14 @@ import { city, km, pct, pln, STAT_LABELS } from '../format';
 interface Trait {
   text: string;
   tone: 'good' | 'bad';
+  hint?: string;
 }
 
 /** Krótkie etykiety zamiast pięciu pasków: tylko skrajne wartości mają wpływ na decyzje. */
 function traits(d: Driver): Trait[] {
   const s = d.stats;
   const out: Trait[] = [];
-  if (s.morale < 40) out.push({ text: 'Morale nisko', tone: 'bad' });
+  if (s.morale < 40) out.push({ text: 'Morale nisko', tone: 'bad', hint: 'Częściej wpada na kontrolach. Pomaga premia i terminowe kursy.' });
   if (s.experience >= 80) out.push({ text: 'Rutyniarz', tone: 'good' });
   else if (s.experience < 30) out.push({ text: 'Świeżak', tone: 'bad' });
   if (s.eco >= 80) out.push({ text: 'Eco-mistrz', tone: 'good' });
@@ -123,8 +124,9 @@ function StatusBlock({ t, now, onFindJob, onService }: { t: TruckView; now: numb
   );
 }
 
-function Details({ t, now }: { t: TruckView; now: number }) {
+function Details({ t, now, onBonus }: { t: TruckView; now: number; onBonus: () => void }) {
   const { driver: d, truck } = t;
+  const bonusAt = d.lastBonusAt === undefined ? 0 : d.lastBonusAt + BALANCE.bonusCooldownDays * 24 * 60;
   return (
     <div className="fc-details" onClick={(e) => e.stopPropagation()}>
       <div className="fc-stats">
@@ -137,6 +139,15 @@ function Details({ t, now }: { t: TruckView; now: number }) {
             <span className="num fc-stat-val">{Math.round(v)}</span>
           </div>
         ))}
+      </div>
+      <div className="fc-morale">
+        <span className="muted">
+          Morale mnoży niezawodność: im niższe, tym częściej kierowca wpada na kontroli ITD. Rośnie przy terminowych kursach,
+          spada przy spóźnieniach i bezczynności, a z czasem wraca do normy.
+        </span>
+        <button className="btn small" disabled={now < bonusAt} onClick={onBonus} title={now < bonusAt ? `Następna premia od ${formatGameTime(bonusAt)}` : undefined}>
+          {now < bonusAt ? `Premia od ${formatGameTime(bonusAt)}` : `Premia ${pln(BALANCE.bonusCost)} · morale +${BALANCE.bonusMorale}`}
+        </button>
       </div>
       <dl className="fc-facts">
         <dt>Pensja</dt>
@@ -173,6 +184,7 @@ function TruckCard({
   onService,
   onShowOnMap,
   onFindJob,
+  onBonus,
 }: {
   t: TruckView;
   now: number;
@@ -183,6 +195,7 @@ function TruckCard({
   onService: () => void;
   onShowOnMap: () => void;
   onFindJob: () => void;
+  onBonus: () => void;
 }) {
   const { truck, driver } = t;
   const tr = traits(driver);
@@ -216,7 +229,7 @@ function TruckCard({
       <footer className="fc-foot">
         <div className="fc-traits">
           {tr.map((x) => (
-            <span key={x.text} className={`fc-trait ${x.tone}`}>
+            <span key={x.text} className={`fc-trait ${x.tone}`} title={x.hint}>
               {x.text}
             </span>
           ))}
@@ -242,7 +255,7 @@ function TruckCard({
         </button>
       </footer>
 
-      {expanded && <Details t={t} now={now} />}
+      {expanded && <Details t={t} now={now} onBonus={onBonus} />}
     </article>
   );
 }
@@ -263,6 +276,7 @@ export function FleetPanel({
   onService,
   onShowOnMap,
   onFindJob,
+  onBonus,
 }: {
   snap: Snapshot;
   selectedId: string | null;
@@ -271,6 +285,7 @@ export function FleetPanel({
   onService: (truckId: string) => void;
   onShowOnMap: (truckId: string) => void;
   onFindJob: (truckId: string) => void;
+  onBonus: (driverId: string) => void;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const leaseCost = BALANCE.hireFee + BALANCE.leaseDeposit;
@@ -313,6 +328,7 @@ export function FleetPanel({
             onService={() => onService(t.truck.id)}
             onShowOnMap={() => onShowOnMap(t.truck.id)}
             onFindJob={() => onFindJob(t.truck.id)}
+            onBonus={() => onBonus(t.driver.id)}
           />
         ))}
       </div>

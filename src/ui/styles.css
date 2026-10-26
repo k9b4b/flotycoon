@@ -349,6 +349,7 @@ select {
 .fc-stat-bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
 .fc-stat-bar > span { display: block; height: 100%; }
 .fc-stat-val { text-align: right; }
+.fc-morale { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; font-size: 12px; }
 .fc-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: 12px; }
 .fc-facts dt { color: var(--muted); }
 .fc-facts dd { margin: 0; }

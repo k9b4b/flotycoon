@@ -14,6 +14,7 @@ export const COST_LABELS: Record<string, string> = {
   repairs: 'Serwis i naprawy',
   fines: 'Mandaty',
   fleet: 'Rekrutacja i kaucje',
+  bonuses: 'Premie',
 };
 
 export const STAT_LABELS: Record<string, string> = {

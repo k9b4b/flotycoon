@@ -183,6 +183,7 @@ export function App() {
             // Na komputerze mapa jest obok, więc od razu pokazujemy na niej zestaw.
             if (!mobile) setFocus({ kind: 'truck', id, n: (focus?.n ?? 0) + 1 });
           }}
+          onBonus={(id) => run(sim.giveBonus(id))}
           onFindJob={(id) => {
             setSelected(id);
             if (mobile) switchTab('market');

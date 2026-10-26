@@ -154,7 +154,7 @@ export function newGame(seed: number): GameState {
     days: [],
     today: { revenue: 0, costs: 0 },
     totals: { revenue: 0, costs: 0, jobsDone: 0, km: 0, lateJobs: 0, penalties: 0 },
-    costsByCategory: { fuel: 0, toll: 0, salaries: 0, lease: 0, repairs: 0, fines: 0, fleet: 0 },
+    costsByCategory: { fuel: 0, toll: 0, salaries: 0, lease: 0, repairs: 0, fines: 0, fleet: 0, bonuses: 0 },
     nextId: 1,
   };
   const d = generateDriver(s);
@@ -305,6 +305,29 @@ export function serviceTruck(s: GameState, truckId: string): ActionResult {
   return { ok: true, message: msg };
 }
 
+export function bonusAvailableAt(d: Driver): number {
+  return d.lastBonusAt === undefined ? 0 : d.lastBonusAt + BALANCE.bonusCooldownDays * 24 * 60;
+}
+
+const BONUS_LINES = [
+  '{nick} dostał{a} premię. Podobno już planuje nowe dywaniki do kabiny.',
+  '{nick} dostał{a} premię i obiecał{a}, że od jutra tylko eco-driving. Zobaczymy.',
+  'Premia dla kierowcy „{nick}”. Na CB od razu lepszy humor.',
+];
+
+export function giveBonus(s: GameState, driverId: string): ActionResult {
+  const d = s.drivers.find((x) => x.id === driverId);
+  if (!d) return { ok: false, error: 'Nie ma takiego kierowcy.' };
+  if (s.now < bonusAvailableAt(d)) return { ok: false, error: `${d.nickname} dostał${g(d)} premię niedawno. Następna od ${formatGameTime(bonusAvailableAt(d))}.` };
+  if (s.cash < BALANCE.bonusCost) return { ok: false, error: 'Nie stać nas nawet na premię. Może pochwała?' };
+  spend(s, BALANCE.bonusCost, 'bonuses');
+  d.stats.morale = clamp(d.stats.morale + BALANCE.bonusMorale);
+  d.lastBonusAt = s.now;
+  const msg = pick(s.rng, BONUS_LINES).replaceAll('{nick}', d.nickname).replaceAll('{a}', g(d));
+  log(s, 'good', `${msg} (−${fmtPLN(BALANCE.bonusCost)}, morale +${BALANCE.bonusMorale})`);
+  return { ok: true, message: msg };
+}
+
 // ─── Obsługa zdarzeń ─────────────────────────────────────────────────────────
 
 function onTripIncident(s: GameState, tripId: string, phaseIdx: number) {
@@ -366,6 +389,10 @@ function onDaily(s: GameState) {
   const leases = s.trucks.reduce((sum, t) => sum + t.leasePerDay, 0);
   spend(s, salaries, 'salaries');
   spend(s, leases, 'lease');
+  // Morale wraca powoli do normy: dobra passa i kryzys mijają, jeśli nic ich nie podtrzymuje.
+  for (const d of s.drivers) {
+    d.stats.morale = clamp(d.stats.morale + (BALANCE.moraleBaseline - d.stats.morale) * BALANCE.moraleReversion);
+  }
   for (const t of s.trucks) {
     if (!t.tripId) {
       const d = s.drivers.find((x) => x.id === t.driverId)!;

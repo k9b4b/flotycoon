@@ -145,3 +145,28 @@ describe('spóźnienia', () => {
     expect(s.totals.lateJobs).toBe(0);
   });
 });
+
+describe('morale', () => {
+  it('wraca do normy i nie przykleja się do 100', () => {
+    const s = newGame(5);
+    const d = s.drivers[0];
+    d.stats.morale = 100;
+    advanceTo(s, s.now + 10 * 24 * 60);
+    expect(d.stats.morale).toBeLessThan(90);
+    d.stats.morale = 10;
+    advanceTo(s, s.now + 10 * 24 * 60);
+    expect(d.stats.morale).toBeGreaterThan(20);
+  });
+
+  it('premia podnosi morale, kosztuje i ma przerwę', async () => {
+    const { giveBonus } = await import('../src/engine/sim');
+    const s = newGame(5);
+    const d = s.drivers[0];
+    d.stats.morale = 30;
+    const cash = s.cash;
+    expect(giveBonus(s, d.id).ok).toBe(true);
+    expect(d.stats.morale).toBe(30 + BALANCE.bonusMorale);
+    expect(s.cash).toBe(cash - BALANCE.bonusCost);
+    expect(giveBonus(s, d.id).ok).toBe(false);
+  });
+});

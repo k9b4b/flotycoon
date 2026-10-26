@@ -28,6 +28,8 @@ export interface Driver {
   lateJobs: number;
   /** Licznik czasu jazdy (tachograf). */
   duty: DutyState;
+  /** Czas gry ostatniej premii (pole opcjonalne: stare zapisy działają bez migracji). */
+  lastBonusAt?: number;
 }
 
 export interface Truck {
@@ -107,7 +109,7 @@ export interface LogEntry {
   text: string;
 }
 
-export type CostCategory = 'fuel' | 'toll' | 'salaries' | 'lease' | 'repairs' | 'fines' | 'fleet';
+export type CostCategory = 'fuel' | 'toll' | 'salaries' | 'lease' | 'repairs' | 'fines' | 'fleet' | 'bonuses';
 
 export interface DayRecord {
   day: number;

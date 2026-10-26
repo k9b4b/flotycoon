@@ -9,6 +9,7 @@ export interface SimApi {
   acceptJob(jobId: string, truckId: string): ActionResult;
   leaseTruck(): ActionResult;
   serviceTruck(truckId: string): ActionResult;
+  giveBonus(driverId: string): ActionResult;
   newGame(seed?: number): void;
   save(): Promise<boolean>;
 }

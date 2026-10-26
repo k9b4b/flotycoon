@@ -3,7 +3,7 @@
  * UI nigdy nie modyfikuje stanu bezpośrednio, tylko woła metody SimApi.
  */
 import { migrate } from '../engine/save';
-import { acceptJob, advanceTo, catchUp, leaseTruck, log, newGame, serviceTruck, type CatchUpReport } from '../engine/sim';
+import { acceptJob, advanceTo, catchUp, giveBonus, leaseTruck, log, newGame, serviceTruck, type CatchUpReport } from '../engine/sim';
 import { BASE_PACE, formatDuration } from '../engine/time';
 import type { GameState } from '../engine/types';
 import { buildSnapshot } from '../engine/view';
@@ -86,6 +86,11 @@ const api: SimApi = {
   },
   leaseTruck() {
     const r = leaseTruck(state!);
+    pushSnapshot();
+    return r;
+  },
+  giveBonus(driverId) {
+    const r = giveBonus(state!, driverId);
     pushSnapshot();
     return r;
   },

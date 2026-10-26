@@ -41,6 +41,12 @@ export const BALANCE = {
   tightBufferMin: 120,
   onTimeMoraleGain: 2,
   idleMoraleDrift: -1,
+  /** Morale każdego dnia zbliża się o ten ułamek różnicy do poziomu wyjściowego. */
+  moraleBaseline: 65,
+  moraleReversion: 0.1,
+  bonusCost: 600,
+  bonusMorale: 12,
+  bonusCooldownDays: 7,
 
   // Postęp offline
   offlineCapMin: 7 * 24 * 60,

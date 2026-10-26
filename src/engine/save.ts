@@ -17,5 +17,8 @@ export function migrate(raw: any): GameState | null {
     if (!step) return null;
     s = step(s);
   }
-  return s.version === SAVE_VERSION ? (s as GameState) : null;
+  if (s.version !== SAVE_VERSION) return null;
+  // Uzupełnienia pól dodanych bez podbijania wersji (bezpieczne domyślne wartości).
+  s.costsByCategory = { bonuses: 0, ...s.costsByCategory };
+  return s as GameState;
 }

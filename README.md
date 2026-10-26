@@ -12,6 +12,10 @@ npm run sim:year   # bot prowadzi firmę przez rok gry, wypisuje bilans
 npm run build      # typecheck + build produkcyjny do dist/
 ```
 
+## Zagraj online
+
+Gra jest wystawiona na GitHub Pages: **https://k9b4b.github.io/flotycoon/** (działa na telefonie i komputerze, bez logowania). Workflow `.github/workflows/pages.yml` buduje ją przy każdym pushu na `main`. Zapis gry trzyma przeglądarka, więc każdy gracz ma swoją firmę.
+
 ## Architektura
 
 ```

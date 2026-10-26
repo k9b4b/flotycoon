@@ -58,7 +58,7 @@ jobs:
           echo "::error title=GraphHopper nie wystartował w 60 min::$(eval "$ANNOTATE_LOG")"; exit 1
 
       - name: Policz trasy
-        run: npx tsx tools/routes/build-routes.ts 2>&1 | tee data/routes.log; test ${PIPESTATUS[0]} -eq 0 || { echo "::error title=Liczenie tras::$(tail -n 30 data/routes.log | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"; exit 1; }
+        run: set +e; npx tsx tools/routes/build-routes.ts 2>&1 | tee data/routes.log; test ${PIPESTATUS[0]} -eq 0 || { echo "::error title=Liczenie tras::$(tail -n 30 data/routes.log | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"; exit 1; }
 
       - name: Log GraphHoppera (przy błędzie)
         if: failure()

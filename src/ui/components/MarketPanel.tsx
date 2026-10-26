@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { formatDuration, formatGameTime } from '../../engine/time';
 import type { Snapshot } from '../../engine/view';
 import { city, km, pln, plnSigned } from '../format';
@@ -18,6 +19,8 @@ export function MarketPanel({
   onPreview: (p: MapPreview | null) => void;
   onShowOnMap: (p: MapPreview) => void;
 }) {
+  // Rozwinięte zlecenie: dopiero wtedy pokazujemy przyciski, żeby lista była czytelna.
+  const [openId, setOpenId] = useState<string | null>(null);
   const free = snap.fleet.filter((t) => t.status === 'idle');
   const active = free.find((t) => t.truck.id === truckId) ?? free[0];
   const jobs = [...snap.market].sort((a, b) => {
@@ -57,13 +60,27 @@ export function MarketPanel({
         {jobs.map((j) => {
           const p = active ? j.previews.find((x) => x.truckId === active.truck.id) : undefined;
           const timeLeft = j.deadline - snap.now;
+          const open = openId === j.id;
+          const toggle = () => {
+            setOpenId(open ? null : j.id);
+            onPreview({ job: j, originId: active?.truck.cityId ?? j.fromId });
+          };
           return (
             <div
-              className="job"
+              className={`job${open ? ' open' : ''}`}
               key={j.id}
+              role="button"
+              tabIndex={0}
+              aria-expanded={open}
               onMouseEnter={() => onPreview({ job: j, originId: active?.truck.cityId ?? j.fromId })}
               onMouseLeave={() => onPreview(null)}
-              onClick={() => onPreview({ job: j, originId: active?.truck.cityId ?? j.fromId })}
+              onClick={toggle}
+              onKeyDown={(e) => {
+                if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                  e.preventDefault();
+                  toggle();
+                }
+              }}
             >
               <div>
                 <div className="route">
@@ -108,24 +125,34 @@ export function MarketPanel({
                     )}
                   </>
                 )}
-                <span style={{ flex: 1 }} />
-                <button
-                  className="btn small mobile-only"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onShowOnMap({ job: j, originId: active?.truck.cityId ?? j.fromId, truckId: active?.truck.id, pinned: true });
-                  }}
-                >
-                  Na mapie
-                </button>
-                <button className="btn small primary" disabled={!p || p.tooFar} onClick={(e) => {
-                    e.stopPropagation();
-                    onPreview(null);
-                    if (active) onAccept(j.id, active.truck.id);
-                  }}>
-                  Bierzemy
-                </button>
               </div>
+              {open && (
+                <div className="job-actions">
+                  {!active && <span className="muted">Wszystkie zestawy w trasie. Przyjąć zlecenie można, gdy któryś się zwolni.</span>}
+                  <span style={{ flex: 1 }} />
+                  <button
+                    className="btn small mobile-only"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onShowOnMap({ job: j, originId: active?.truck.cityId ?? j.fromId, truckId: active?.truck.id, pinned: true });
+                    }}
+                  >
+                    Na mapie
+                  </button>
+                  <button
+                    className="btn small primary"
+                    disabled={!p || p.tooFar}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPreview(null);
+                      setOpenId(null);
+                      if (active) onAccept(j.id, active.truck.id);
+                    }}
+                  >
+                    Bierzemy
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}

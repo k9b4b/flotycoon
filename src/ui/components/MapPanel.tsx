@@ -1,6 +1,6 @@
 import { formatClock, formatDuration, formatGameTime } from '../../engine/time';
 import { PHASE_LABEL, type Snapshot, type TruckView } from '../../engine/view';
-import { city } from '../format';
+import { city, km, pln, plnSigned } from '../format';
 import { FleetMap, type MapFocus, type MapPreview } from '../map/FleetMap';
 
 const STATUS_COLOR: Record<string, string> = {
@@ -23,6 +23,8 @@ export function MapPanel({
   preview,
   visible = true,
   focus = null,
+  onAcceptPreview,
+  onClosePreview,
 }: {
   snap: Snapshot;
   pace: number;
@@ -31,6 +33,8 @@ export function MapPanel({
   preview: MapPreview | null;
   visible?: boolean;
   focus?: MapFocus | null;
+  onAcceptPreview?: (jobId: string, truckId: string) => void;
+  onClosePreview?: () => void;
 }) {
   return (
     <section className="panel area-map">
@@ -41,7 +45,12 @@ export function MapPanel({
           {snap.fleet.filter((t) => t.trip).length} w trasie · {snap.fleet.filter((t) => t.status === 'idle').length} wolnych
         </span>
       </div>
-      <FleetMap snap={snap} pace={pace} selectedId={selectedId} onSelect={onSelect} preview={preview} visible={visible} focus={focus} />
+      <div className="map-stage">
+        <FleetMap snap={snap} pace={pace} selectedId={selectedId} onSelect={onSelect} preview={preview} visible={visible} focus={focus} />
+        {preview?.pinned && onAcceptPreview && onClosePreview && (
+          <PreviewCard snap={snap} preview={preview} onAccept={onAcceptPreview} onClose={onClosePreview} />
+        )}
+      </div>
       <div className="map-legend">
         <span><i style={{ background: 'var(--accent)' }} />z ładunkiem</span>
         <span><i style={{ background: 'var(--info)' }} />na pusto / załadunek</span>
@@ -112,6 +121,62 @@ function TripTimeline({ t, now }: { t?: TruckView; now: number }) {
             {PHASE_LABEL[k as keyof typeof PHASE_LABEL]}: <span className="num">{formatDuration(v)}</span>
           </span>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/** Karta zlecenia na mapie: pozwala przyjąć je bez wracania na giełdę. */
+function PreviewCard({
+  snap,
+  preview,
+  onAccept,
+  onClose,
+}: {
+  snap: Snapshot;
+  preview: MapPreview;
+  onAccept: (jobId: string, truckId: string) => void;
+  onClose: () => void;
+}) {
+  // Bierzemy świeże dane z giełdy: zlecenie mogło wygasnąć, a zestaw ruszyć w trasę.
+  const job = snap.market.find((j) => j.id === preview.job.id);
+  const p = job?.previews.find((x) => x.truckId === preview.truckId);
+  const truck = snap.fleet.find((t) => t.truck.id === preview.truckId);
+  return (
+    <div className="preview-card" role="dialog" aria-label="Podgląd zlecenia">
+      <div className="truck-row">
+        <strong>
+          {city(preview.job.fromId)} → {city(preview.job.toId)}
+        </strong>
+        <span className="muted num" style={{ fontSize: 12 }}>
+          {km(preview.job.km)}
+        </span>
+        <span style={{ flex: 1 }} />
+        <strong className="num">{pln(preview.job.payment)}</strong>
+      </div>
+      <div className="muted" style={{ fontSize: 12 }}>
+        {preview.job.cargo} · {preview.job.weightT} t · {preview.job.client}
+      </div>
+      {job && p && truck ? (
+        <div className="truck-row" style={{ fontSize: 12 }}>
+          <span className="muted">{truck.driver.nickname}</span>
+          {p.emptyKm > 0 && <span className="muted">dojazd {km(p.emptyKm)}</span>}
+          <span className="muted">ETA {formatGameTime(p.eta)}</span>
+          <span className={p.profit >= 0 ? 'good num' : 'bad num'}>{plnSigned(p.profit)}</span>
+          {p.tooFar ? <span className="badge bad">za daleko</span> : !p.onTime ? <span className="badge bad">nie zdąży</span> : <span className="badge good">na czas</span>}
+        </div>
+      ) : (
+        <div className="bad" style={{ fontSize: 12 }}>
+          {!job ? 'Zlecenie już nieaktualne. Ktoś był szybszy.' : 'Ten zestaw nie jest już wolny.'}
+        </div>
+      )}
+      <div className="preview-actions">
+        <button className="btn" onClick={onClose}>
+          Zamknij
+        </button>
+        <button className="btn primary" disabled={!job || !p || p.tooFar} onClick={() => job && preview.truckId && onAccept(job.id, preview.truckId)}>
+          Bierzemy
+        </button>
       </div>
     </div>
   );

@@ -160,6 +160,12 @@ export function App() {
           preview={preview}
           visible={!mobile || tab === 'map'}
           focus={focus}
+          onAcceptPreview={(j, t) => {
+            setPreview(null);
+            setSelected(t);
+            void run(sim.acceptJob(j, t));
+          }}
+          onClosePreview={() => setPreview(null)}
         />
         <MarketPanel
           snap={snap}

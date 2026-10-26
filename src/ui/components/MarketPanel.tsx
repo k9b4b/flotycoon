@@ -103,7 +103,7 @@ export function MarketPanel({
                   className="btn small mobile-only"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onShowOnMap({ job: j, originId: active?.truck.cityId ?? j.fromId });
+                    onShowOnMap({ job: j, originId: active?.truck.cityId ?? j.fromId, truckId: active?.truck.id, pinned: true });
                   }}
                 >
                   Na mapie

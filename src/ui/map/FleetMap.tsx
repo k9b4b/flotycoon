@@ -12,6 +12,10 @@ import { buildStyle, EU_BOUNDS, PL_BOUNDS } from './style';
 export interface MapPreview {
   job: JobView;
   originId: string;
+  /** Zestaw, dla którego liczony jest podgląd (do przyjęcia zlecenia z mapy). */
+  truckId?: string;
+  /** Podgląd otwarty przyciskiem „Na mapie”: zostaje z kartą do przyjęcia zlecenia. */
+  pinned?: boolean;
 }
 
 interface Props {
@@ -236,7 +240,8 @@ export function FleetMap({ snap, pace, selectedId, onSelect, preview, visible = 
             [Math.min(...lons), Math.min(...lats)],
             [Math.max(...lons), Math.max(...lats)],
           ],
-          { padding: 48, duration: 700, maxZoom: 8 },
+          // Pod przypiętym podglądem jest karta zlecenia, więc zostawiamy pod nią miejsce.
+          { padding: { top: 56, left: 40, right: 40, bottom: preview.pinned ? 210 : 48 }, duration: 700, maxZoom: 8 },
         );
       }
     });

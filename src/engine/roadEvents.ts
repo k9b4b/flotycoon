@@ -65,7 +65,8 @@ const ri = (c: EventCtx, a: number, b: number) => randInt(c.r, a, b);
 /** Szansa powodzenia z poprawką na charakter: stoik ma szczęście do ryzyka, narwany pecha. */
 const luck = (c: EventCtx, p: number) => clamp(p + (c.has('stoik') ? 0.1 : 0) - (c.has('narwany') ? 0.1 : 0), 0.02, 0.98);
 const n = (c: EventCtx, k: string) => Number(c.vars[k]);
-const fragile = (trip: Trip) => /OSTROŻNIE|Bombki|Piwo/.test(trip.job.cargo);
+/** Towary, którym grzechot w naczepie szkodzi najbardziej. */
+const fragile = (trip: Trip) => /Bombki|Piwo|Lodówki|Leki/.test(trip.job.cargo);
 
 export const ROAD_EVENTS: readonly RoadEventDef[] = [
   {

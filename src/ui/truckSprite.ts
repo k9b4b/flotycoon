@@ -89,17 +89,52 @@ function mix(a: string, b: string, t: number): string {
   return `#${((1 << 24) | (c(16) << 16) | (c(8) << 8) | c(0)).toString(16).slice(1)}`;
 }
 
+/** Siatka pikseli; ox przesuwa rysowanie (ciągnik w zestawie stoi za naczepą). */
 class Grid {
-  px: (string | null)[] = new Array(W * H).fill(null);
+  px: (string | null)[];
+  ox = 0;
+  constructor(
+    readonly w: number,
+    readonly h: number,
+  ) {
+    this.px = new Array(w * h).fill(null);
+  }
   set(x: number, y: number, c: string) {
-    if (x >= 0 && y >= 0 && x < W && y < H) this.px[y * W + x] = c;
+    x += this.ox;
+    if (x >= 0 && y >= 0 && x < this.w && y < this.h) this.px[y * this.w + x] = c;
   }
   get(x: number, y: number) {
-    return x >= 0 && y >= 0 && x < W && y < H ? this.px[y * W + x] : null;
+    x += this.ox;
+    return x >= 0 && y >= 0 && x < this.w && y < this.h ? this.px[y * this.w + x] : null;
   }
 }
 
+function wheelAt(g: Grid, cx: number, wear: number) {
+  const rows = [
+    [-1, 1],
+    [-2, 2],
+    [-3, 3],
+    [-3, 3],
+    [-3, 3],
+    [-2, 2],
+    [-1, 1],
+  ];
+  rows.forEach(([a, b], i) => {
+    const y = GROUND - 6 + i;
+    for (let x = cx + a; x <= cx + b; x++) g.set(x, y, TIRE);
+  });
+  for (let y = GROUND - 4; y <= GROUND - 2; y++) for (let x = cx - 1; x <= cx + 1; x++) g.set(x, y, wear > 0.6 ? '#7d746a' : RIM);
+  g.set(cx, GROUND - 3, '#3a3e44');
+  g.set(cx - 1, GROUND - 4, '#dfe3e6');
+}
+
 export function truckSvg(t: TruckLook): string {
+  const g = new Grid(W, H);
+  drawTruck(t, g);
+  return finish(g, 4, 38);
+}
+
+function drawTruck(t: TruckLook, g: Grid) {
   const r = createRng(hash(`${t.plate}|${t.brand}|${t.model}`));
   const base = SHAPES[`${t.brand} ${t.model.split(' ')[0]}`] ?? SHAPES[t.brand] ?? SHAPES.MEN;
   // Wersje „S”, „XF”, „FH” i podobne mają wyższe kabiny; liczba w modelu nie zmienia sylwetki.
@@ -112,7 +147,6 @@ export function truckSvg(t: TruckLook): string {
   const accent = pick(r, ACCENTS.filter((a) => a !== paint));
   const stripe = rand(r) < 0.5;
   const stack = rand(r) < 0.3; // pionowy wydech za kabiną
-  const g = new Grid();
 
   const FRONT = 41; // przód kabiny (zderzak)
   const CAB_L = 24; // tył kabiny (z leżanką)
@@ -203,24 +237,8 @@ export function truckSvg(t: TruckLook): string {
     }
 
   // ── Koła (z wnęką nad przednim) ──
-  const wheel = (cx: number) => {
-    const rows = [
-      [-1, 1],
-      [-2, 2],
-      [-3, 3],
-      [-3, 3],
-      [-3, 3],
-      [-2, 2],
-      [-1, 1],
-    ];
-    rows.forEach(([a, b], i) => {
-      const y = GROUND - 6 + i;
-      for (let x = cx + a; x <= cx + b; x++) g.set(x, y, TIRE);
-    });
-    for (let y = GROUND - 4; y <= GROUND - 2; y++) for (let x = cx - 1; x <= cx + 1; x++) g.set(x, y, wear > 0.6 ? '#7d746a' : RIM);
-    g.set(cx, GROUND - 3, '#3a3e44');
-    g.set(cx - 1, GROUND - 4, '#dfe3e6');
-  };
+  const wheel = (cx: number) => wheelAt(g, cx, wear);
+
   for (let x = FRONT_AXLE - 4; x <= FRONT_AXLE + 4; x++) for (let y = 18; y <= 20; y++) if (!(y === 18 && (x === FRONT_AXLE - 4 || x === FRONT_AXLE + 4))) g.set(x, y, '#121316');
   wheel(FRONT_AXLE);
   wheel(REAR_AXLE);
@@ -239,7 +257,12 @@ export function truckSvg(t: TruckLook): string {
     g.set(sx, sy + 1, '#fff6c8');
   }
 
-  // ── Kontur ──
+}
+
+/** Kontur, cień i zamiana siatki na SVG (pasy pikseli w jednym kolorze to jeden prostokąt). */
+function finish(g: Grid, shadowX: number, shadowW: number): string {
+  g.ox = 0;
+  const W = g.w;
   const add: [number, number][] = [];
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
@@ -251,7 +274,7 @@ export function truckSvg(t: TruckLook): string {
 
   let rects = '';
   // Cień na drodze.
-  rects += `<rect x="4" y="${GROUND + 1}" width="38" height="1" fill="#000" fill-opacity=".28"/>`;
+  rects += `<rect x="${shadowX}" y="${GROUND + 1}" width="${shadowW}" height="1" fill="#000" fill-opacity=".28"/>`;
   for (let y = 0; y < H; y++) {
     let x = 0;
     while (x < W) {
@@ -267,4 +290,149 @@ export function truckSvg(t: TruckLook): string {
     }
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" shape-rendering="crispEdges">${rects}</svg>`;
+}
+
+// ─── Zestaw: naczepa za ciągnikiem ──────────────────────────────────────────
+
+export type RigTrailer = { type: 'curtain' | 'reefer' | 'adr' | 'lowbed'; wear: number; label: string };
+
+/** Naczepa jest skrócona względem prawdziwej (ok. 1,5× ciągnika zamiast 2,2×), żeby karta nie była za szeroka. */
+const TRAILER_L = 64;
+/** Przesunięcie ciągnika: przód naczepy (x = 64) wypada tuż za kabiną (x ciągnika 24). */
+const RIG_OX = 43;
+export const RIG_W = RIG_OX + W;
+
+const CURTAIN_PAINTS = ['#3f6496', '#2f6b45', '#8a2b2b', '#5b6670', '#c9a227', '#2b3a55', '#d4d7da'];
+
+function drawTrailer(g: Grid, tr: RigTrailer) {
+  const r = createRng(hash(tr.label + tr.type));
+  const wear = Math.max(0, Math.min(1, tr.wear));
+  const FRAME = '#2a2e35';
+  const F = TRAILER_L; // przód
+  const axles = [9, 16, 23];
+  const chassis = (x0: number, x1: number, y: number) => {
+    for (let x = x0; x <= x1; x++) g.set(x, y, CHASSIS);
+  };
+  const legs = () => {
+    for (let y = 19; y <= 23; y++) g.set(46, y, '#3a3e44');
+    for (let x = 45; x <= 47; x++) g.set(x, 24, '#2b2e33');
+  };
+  const tail = () => {
+    for (let x = 1; x <= 4; x++) g.set(x, 20, '#3a3e44');
+    g.set(0, 15, '#e0533f');
+    g.set(0, 16, '#b8312f');
+  };
+  const guards = () => {
+    for (let x = 4; x <= 28; x++) g.set(x, 19, x % 7 === 5 ? '#121316' : '#26282c');
+  };
+
+  if (tr.type === 'curtain' || tr.type === 'reefer') {
+    const reefer = tr.type === 'reefer';
+    const paint = reefer ? '#e6ebf0' : mix(pick(r, CURTAIN_PAINTS), '#8a8a84', wear * 0.3);
+    const top = 3;
+    for (let y = top; y <= 17; y++)
+      for (let x = 0; x <= F; x++) {
+        let c = paint;
+        if (y === top) c = reefer ? '#b7c0c8' : FRAME;
+        else if (y === 17) c = reefer ? '#9aa3ac' : FRAME;
+        else if (x === 0 || x === F) c = reefer ? '#b7c0c8' : FRAME;
+        else if (!reefer && x % 4 === 2) c = shift(paint, -0.16); // fałdy firanki
+        else if (!reefer && y === top + 1) c = shift(paint, 0.15);
+        else if (reefer && x % 8 === 4) c = '#d3dae0'; // przetłoczenia izotermy
+        g.set(x, y, c);
+      }
+    if (reefer) {
+      const acc = pick(r, ['#4f8fd6', '#2f9e6b', '#d9661f', '#b8312f']);
+      for (let x = 6; x <= F - 6; x++) {
+        g.set(x, 9, acc);
+        g.set(x, 10, shift(acc, -0.2));
+      }
+      // agregat na ścianie czołowej
+      for (let y = 5; y <= 12; y++) for (let x = F + 1; x <= F + 2; x++) g.set(x, y, y % 2 ? '#8d969f' : '#5d646c');
+    } else {
+      // napinacze firanki przy dole
+      for (let x = 3; x <= F - 2; x += 4) g.set(x, 16, shift(paint, -0.3));
+    }
+    chassis(2, F - 2, 18);
+    guards();
+    legs();
+    tail();
+  } else if (tr.type === 'adr') {
+    const rows: [number, number, number, string][] = [
+      [4, 10, F - 10, '#8b929c'], // pomost
+      [5, 4, F - 4, '#eef1f5'],
+      [6, 3, F - 3, '#dde2e8'],
+      [7, 2, F - 2, '#cdd2d9'],
+      [8, 2, F - 2, '#c9ced6'],
+      [9, 2, F - 2, '#c9ced6'],
+      [10, 2, F - 2, '#c4c9d1'],
+      [11, 2, F - 2, '#bfc5cd'],
+      [12, 2, F - 2, '#b8bec7'],
+      [13, 2, F - 2, '#b0b7c0'],
+      [14, 2, F - 2, '#a6adb7'],
+      [15, 3, F - 3, '#9aa2ac'],
+      [16, 4, F - 4, '#8b929c'],
+    ];
+    for (const [y, x0, x1, c] of rows) for (let x = x0; x <= x1; x++) g.set(x, y, c);
+    for (const bx of [17, 32, 47]) for (let y = 5; y <= 16; y++) g.set(bx, y, '#a2a9b3');
+    for (let x = 12; x <= F - 12; x += 6) g.set(x, 3, '#8b929c'); // barierki
+    for (let x = 2; x <= F - 2; x++) g.set(x, 17, FRAME);
+    for (let y = 9; y <= 11; y++) for (let x = 3; x <= 6; x++) g.set(x, y, y === 9 || y === 11 ? '#c96a12' : '#f28c28'); // tablica ADR
+    for (let x = 22; x <= 27; x++) g.set(x, 17, '#3a3e44'); // skrzynka zaworów
+    chassis(2, F - 2, 18);
+    guards();
+    legs();
+    tail();
+  } else {
+    const Y = '#d9a520';
+    const YH = '#f0c24a';
+    // łabędzia szyja nad siodłem
+    for (let y = 12; y <= 17; y++) for (let x = 46; x <= F; x++) g.set(x, y, y === 12 ? YH : y === 17 ? shift(Y, -0.25) : Y);
+    for (let y = 14; y <= 19; y++) for (let x = 42; x <= 45; x++) if (x - 42 >= (19 - y) * 0.6) g.set(x, y, y === 14 ? YH : Y);
+    // niski pokład
+    for (let x = 1; x <= 45; x++) {
+      g.set(x, 18, YH);
+      g.set(x, 19, Y);
+    }
+    for (let x = 6; x <= 40; x += 5) g.set(x, 19, shift(Y, -0.3));
+    for (let y = 15; y <= 17; y++) g.set(1, y, y % 2 ? '#e0533f' : '#f2f2f2'); // oznakowanie gabarytu
+    g.set(0, 16, '#e0533f');
+  }
+  for (const a of axles) wheelAt(g, a, wear);
+  // brud i rdza z wiekiem
+  if (wear > 0.4)
+    for (let x = 1; x < F; x++) {
+      const c = g.get(x, 16);
+      if (c && rand(r) < wear - 0.2) g.set(x, 16, mix(c, '#6b5a45', 0.45));
+    }
+  const rust = Math.round(wear * wear * 18);
+  for (let i = 0; i < rust; i++) {
+    const x = 2 + Math.floor(rand(r) * (F - 4));
+    const y = 13 + Math.floor(rand(r) * 4);
+    if (g.get(x, y)) g.set(x, y, rand(r) < 0.5 ? '#8a4b22' : '#a8602b');
+  }
+}
+
+/** Cały zestaw z boku: naczepa i ciągnik (RIG_W×28). Bez naczepy sam ciągnik na tej samej szerokości. */
+export function rigSvg(t: TruckLook, tr: RigTrailer | null): string {
+  const g = new Grid(RIG_W, H);
+  if (tr) drawTrailer(g, tr);
+  g.ox = RIG_OX;
+  drawTruck(t, g);
+  const svg = finish(g, tr ? 1 : RIG_OX + 4, tr ? RIG_W - 3 : 38);
+  if (tr) return svg;
+  // Pusty zestaw: przerywany zarys naczepy, żeby brak był widoczny na pierwszy rzut oka.
+  let ghost = '';
+  for (let x = 1; x <= TRAILER_L; x += 3) ghost += `<rect x="${x}" y="3" width="2" height="1"/><rect x="${x}" y="17" width="2" height="1"/>`;
+  for (let y = 3; y <= 17; y += 3) ghost += `<rect x="0" y="${y}" width="1" height="2"/><rect x="${TRAILER_L}" y="${y}" width="1" height="2"/>`;
+  return svg.replace('</svg>', `<g fill="#8a919b" fill-opacity=".45">${ghost}</g></svg>`);
+}
+
+export const TRAILER_W = TRAILER_L + 3;
+
+/** Sama naczepa w tym samym stylu co zestaw (na rynek i listę naczep). */
+export function trailerOnlySvg(tr: RigTrailer): string {
+  const g = new Grid(TRAILER_W, H);
+  drawTrailer(g, tr);
+  return finish(g, 1, TRAILER_W - 2);
 }

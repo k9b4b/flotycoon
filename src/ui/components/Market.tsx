@@ -146,7 +146,7 @@ function TrailerOfferCard({ o, snap, blocked, a }: { o: TrailerOffer; snap: Snap
   return (
     <article className={`staff-card offer-card${locked ? ' is-locked' : ''}`}>
       <div className="offer-head">
-        <TrailerSprite type={o.type} wear={o.wear} scale={2} />
+        <TrailerSprite type={o.type} wear={o.wear} seed={o.id} scale={2} />
         <div className="offer-title">
           <strong>{spec.name}</strong>
           <span className={`badge ${o.condition === 'new' ? 'good' : 'warn'}`}>{o.condition === 'new' ? 'nowa' : 'używana'}</span>
@@ -263,7 +263,7 @@ function TrailerCard({ v, a, idleTrucks }: { v: TrailerView; a: FleetActions; id
   return (
     <article className={`staff-card${v.truckId ? '' : ' is-free'}`}>
       <div className="offer-head">
-        <TrailerSprite type={tr.type} wear={tr.wear} scale={2} />
+        <TrailerSprite type={tr.type} wear={tr.wear} seed={tr.label} scale={2} />
         <div className="offer-title">
           <strong>
             {spec.name} <span className="plate">{tr.label}</span>

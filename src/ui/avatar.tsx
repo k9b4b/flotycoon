@@ -1,7 +1,6 @@
 import type { Driver } from '../engine/types';
 import { portraitSvg } from './portrait';
-import { truckSvg, type TruckLook } from './truckSprite';
-import { trailerSvg, TRAILER_SPRITE_SIZE } from './trailerSprite';
+import { rigSvg, trailerOnlySvg, truckSvg, RIG_W, TRAILER_W, type RigTrailer, type TruckLook } from './truckSprite';
 import type { TrailerType } from '../data/trailers';
 
 /**
@@ -38,14 +37,25 @@ export function TruckSprite({ t, scale = 2 }: { t: TruckLook; scale?: number }) 
   return <span className="truck-sprite" style={{ width: 44 * scale, height: 28 * scale }} aria-hidden dangerouslySetInnerHTML={{ __html: svg }} />;
 }
 
-/** Pikselowa naczepa (ui/trailerSprite.ts). */
-export function TrailerSprite({ type, wear = 0, scale = 2 }: { type: TrailerType; wear?: number; scale?: number }) {
-  return (
-    <span
-      className="trailer-sprite"
-      style={{ width: TRAILER_SPRITE_SIZE.w * scale, height: TRAILER_SPRITE_SIZE.h * scale }}
-      aria-hidden
-      dangerouslySetInnerHTML={{ __html: trailerSvg(type, wear) }}
-    />
-  );
+/** Pikselowa naczepa, ta sama co w zestawie. seed ustala kolor plandeki (numer naczepy albo id oferty). */
+export function TrailerSprite({ type, wear = 0, seed = '', scale = 2 }: { type: TrailerType; wear?: number; seed?: string; scale?: number }) {
+  const key = `tr|${type}|${seed}|${Math.round(wear * 10)}`;
+  let svg = truckCache.get(key);
+  if (!svg) {
+    svg = trailerOnlySvg({ type, wear: Math.round(wear * 10) / 10, label: seed });
+    truckCache.set(key, svg);
+  }
+  return <span className="trailer-sprite" style={{ width: TRAILER_W * scale, height: 28 * scale }} aria-hidden dangerouslySetInnerHTML={{ __html: svg }} />;
+}
+
+/** Cały zestaw: ciągnik z naczepą (albo z zarysem pustego miejsca, gdy naczepy brak). */
+export function RigSprite({ t, trailer, scale = 2 }: { t: TruckLook; trailer: RigTrailer | null; scale?: number }) {
+  const key = `${t.plate}|${t.brand}|${t.model}|${Math.round(t.wear * 20)}|${t.condition ?? ''}|${trailer ? `${trailer.label}|${trailer.type}|${Math.round(trailer.wear * 10)}` : '-'}`;
+  let svg = truckCache.get(key);
+  if (!svg) {
+    svg = rigSvg({ ...t, wear: Math.round(t.wear * 20) / 20 }, trailer && { ...trailer, wear: Math.round(trailer.wear * 10) / 10 });
+    if (truckCache.size > 400) truckCache.clear();
+    truckCache.set(key, svg);
+  }
+  return <span className="truck-sprite rig-sprite" style={{ width: RIG_W * scale, height: 28 * scale }} aria-hidden dangerouslySetInnerHTML={{ __html: svg }} />;
 }

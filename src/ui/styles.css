@@ -719,7 +719,7 @@ select {
 .fc-truckrow { display: none; }
 @media (max-width: 720px) {
   .fc-head .fc-truck, .fc-head .truck-sprite { display: none; }
-  .fc-truckrow { display: flex; align-items: center; gap: 12px; margin-top: -2px; }
+  .fc-truckrow { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin-top: -2px; }
   .fc-truckrow-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 13px; color: var(--muted); }
   .fc-truckrow-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 }
@@ -907,3 +907,4 @@ select {
   .subtabs button { padding-inline: 3px; gap: 3px; font-size: 12px; }
   .subtabs .num { padding: 2px 4px; font-size: 10px; }
 }
+.trailer-sprite svg { width: 100%; height: 100%; display: block; }

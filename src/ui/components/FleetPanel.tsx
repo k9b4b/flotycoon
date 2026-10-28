@@ -11,7 +11,7 @@ import type { Snapshot, TruckView } from '../../engine/view';
 import { city, km, pct, pln } from '../format';
 import { PerkList, ScoreBadge, StatBars, TraitChips, wearColor } from './driverUi';
 import { DriverPicker } from './Pairing';
-import { DriverAvatar, TruckSprite } from '../avatar';
+import { DriverAvatar, RigSprite } from '../avatar';
 import { DriversList } from './Staffing';
 import { ConfirmButton, TrailersList, VehicleMarket, type MarketSeg } from './Market';
 
@@ -342,7 +342,7 @@ function TruckCard({
           </div>
         </div>
         <div className="fc-right">
-          <TruckSprite t={truck} />
+          <RigSprite t={truck} trailer={t.trailer} />
           {t.status === 'idle' && <span className="fc-pill">Wolny</span>}
           {t.status === 'nodriver' && <span className="fc-pill">Bez kierowcy</span>}
           {t.status === 'notrailer' && <span className="fc-pill">Bez naczepy</span>}
@@ -350,7 +350,7 @@ function TruckCard({
       </header>
       {/* Na telefonie auto ma osobny wiersz pod kierowcą, żeby nagłówek nie był ściśnięty. */}
       <div className="fc-truckrow">
-        <TruckSprite t={truck} />
+        <RigSprite t={truck} trailer={t.trailer} />
         <div className="fc-truckrow-info">
           <span>
             {truck.brand} {truck.model}

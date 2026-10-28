@@ -18,7 +18,7 @@ Gra jest wystawiona na GitHub Pages: **https://k9b4b.github.io/flotycoon/** (dzi
 
 ## Zakładanie firmy
 
-Przy pierwszym uruchomieniu (albo po „Zacznij od nowa z inną firmą” pod „?”) kreator prowadzi przez 4 kroki (`ui/components/SetupWizard.tsx`): nazwa firmy (z humorystycznymi podpowiedziami), siedziba (jedno z 13 miast z własnymi plusami i minusami w `data/hq.ts`: liczba ofert na giełdzie, stawki zleceń z siedziby, pensje lokalnego rynku pracy, koszt rozbudowy bazy i dotacja na start; tu odbiera się auta z salonu i stąd częściej startują zlecenia. Bot w każdym mieście kończy pół roku w przedziale ok. ±15–20% wartości firmy), pierwszy ciągnik z trzech ofert (od najtańszej raty po najwyższą) i pierwszy kierowca z trzech kandydatów (od najtańszego po najlepszego z ogłoszeń). Propozycje liczy silnik (`setupOptions(seed)`), wybory trafiają do `newGame(seed, setup)`.
+Przy pierwszym uruchomieniu (albo po „Zacznij od nowa z inną firmą” pod „?”) kreator prowadzi przez 4 kroki (`ui/components/SetupWizard.tsx`): nazwa firmy (z humorystycznymi podpowiedziami), siedziba (jedno z 13 miast z własnymi plusami i minusami w `data/hq.ts`: liczba ofert na giełdzie, stawki zleceń z siedziby, pensje lokalnego rynku pracy, koszt rozbudowy bazy i dotacja na start; tu odbiera się kupiony sprzęt i stąd częściej startują zlecenia. Bot w każdym mieście kończy pół roku w przedziale ok. ±15–20% wartości firmy), pierwszy ciągnik z trzech ofert (od taniego i wyjeżdżonego po prawie nowy) w leasingu bez kaucji albo za gotówkę, jeśli wystarczy pieniędzy, plus plandeka „po wujku” i pierwszy kierowca z trzech kandydatów (od najtańszego po najlepszego z ogłoszeń). Propozycje liczy silnik (`setupOptions(seed)`), wybory trafiają do `newGame(seed, setup)`.
 
 ## Samouczek
 
@@ -82,18 +82,25 @@ Profil ciężarówki (`tools/routes/flotruck.json`) omija drogi z ograniczeniem 
 
 Firma awansuje dzięki **reputacji**: terminowy kurs daje punkt (pilny dwa), spóźnienie zabiera 4, mandat z ITD 2. Rangi (`data/progression.ts`): „Jeden gość z Iveco” → „Firma krzak” → „Lokalny przewoźnik” → „Przewoźnik krajowy” → „Spedycja z ambicjami” → „Gracz z prawdziwego zdarzenia” → „Potentat ze Strykowa”.
 
-Ranga odblokowuje rozbudowę bazy, a im wyższa, tym lepsi kandydaci na kierowców i szersza oferta salonu:
+Ranga odblokowuje rozbudowę bazy, a im wyższa, tym lepsi kandydaci na kierowców i szersza oferta sprzętu:
 
 - **Plac**: limit aut (3 → 6 → 12 → 25 → 50); kierowców może być o 3 więcej.
 - **Własny warsztat**: serwis 40% taniej i dwa razy krócej.
 - **Biuro spedycji**: więcej ofert i ładunków powrotnych.
 - **Dyspozytorka Halina**: sama przydziela bezpieczne ładunki wolnym zestawom i wysyła zużyte auta do serwisu (można ją wstrzymać).
 
-**Kierowcy i auta są osobno.** Rynek pracy pokazuje kandydatów (zmiana co 2 dni) z oczekiwaną pensją rosnącą ze statystykami. Salon oferuje auta w leasingu (zmiana co 3 dni): używane z kaucją 6 000 zł, a od rangi „Lokalny przewoźnik” także nowe, oszczędniejsze i bez zużycia, ale z dwa razy wyższą ratą. Gra nie łączy par sama: kto czym jeździ, decyduje gracz. Przesadzenie kierowcy do zajętego auta zamienia kierowców miejscami (gdy żaden nie jest w trasie), a listy wyboru pokazują ocenę kierowcy (średnia umiejętności) i parametry aut. Kierowcę można zwolnić (odprawa 5 dniówek), a auto zwrócić (kara 5 rat, kaucja przepada).
+**Kierowcy i auta są osobno.** Rynek pracy pokazuje kandydatów (zmiana co 2 dni) z oczekiwaną pensją rosnącą ze statystykami. Gra nie łączy par sama: kto czym jeździ, decyduje gracz. Przesadzenie kierowcy do zajętego auta zamienia kierowców miejscami (gdy żaden nie jest w trasie), a listy wyboru pokazują ocenę kierowcy (średnia umiejętności) i parametry aut. Kierowcę można zwolnić (odprawa 5 dniówek).
+
+**Rynek ciągników i naczep** (`engine/assets.ts`, UI w `ui/components/Market.tsx`): Flota ma zakładki Zestawy · Kierowcy · Naczepy · Rynek, a Rynek segmenty Ciągniki / Naczepy / Kierowcy i filtr Wszystkie / Nowe / Używane. Każda oferta ma kilka parametrów (ciągnik: przebieg, spalanie, norma Euro, zużycie; naczepa: zużycie i wymagania) i dwa przyciski:
+- **Kup**: cena z góry, zero rat, sprzęt jest własny i można go później sprzedać za ok. 90% wartości. Wartość liczy się od ceny nowego (`newPrice` w `data/flavor.ts` i `data/trailers.ts`) i spada z przebiegiem i zużyciem.
+- **Leasing**: kaucja (ok. 5% wartości) i rata dzienna zależna od wartości; zwrot przed czasem kosztuje 5 rat, kaucja przepada.
+Pod ofertą widać, po ilu dniach raty zakup by się zwrócił. Oferty zmieniają się co 3 dni; zawsze jest co najmniej jeden nowy i jeden używany ciągnik oraz nowa i używana plandeka.
+
+**Naczepa to osobny sprzęt.** Ciągnik bez naczepy nie weźmie zlecenia (status „Bez naczepy” z wyborem wolnej naczepy). W zakładce Naczepy widać, co jest pod którym ciągnikiem, a co stoi na placu; naczepy przepina się między stojącymi zestawami (zajęta naczepa zamienia się miejscami), a poza siedzibą podstawienie kosztuje 300 zł. Na placu mieści się 2× więcej naczep niż ciągników. Zużycie naczepy dokłada się do ryzyka awarii, a serwis zestawu odnawia też naczepę. Stare zapisy (v4) dostają naczepy jako osobne pozycje: plandeki na własność, specjalne w leasingu.
 
 **Kontrakty** (`engine/contracts.ts`, liczby w `data/development.ts`): od rangi „Firma krzak” klienci proponują stałe trasy (np. co 3 dni, 6–12 kursów) za stawkę o ok. 12% lepszą od giełdy. Każdy kurs pojawia się na giełdzie dobę przed załadunkiem i wisi na górze listy. Kurs, którego nikt nie weźmie, kosztuje karę; spóźnienie albo przepadnięty kurs to wpadka, a po 3 wpadkach klient zrywa umowę. Dokończona umowa daje premię i reputację. Limit kontraktów rośnie z rangą (biuro +1), Halina bierze kursy kontraktowe w pierwszej kolejności.
 
-**Naczepy i ładunki specjalne** (`data/trailers.ts`, ładunki w `data/flavor.ts`): każdy zestaw ma jedną naczepę. Plandeka jest w pakiecie z ciągnikiem; chłodnia (od rangi 1, +6% paliwa), cysterna ADR (od rangi 2, kierowca z kursem ADR, częstsze kontrole) i niskopodwozie na gabaryty (od rangi 3, wolniej, doświadczenie min. 55) kosztują ratę dzienną i opłatę za podpięcie, a ich ładunki płacą ok. 25–50% lepiej. Ładunki specjalne wiszą na giełdzie obok zwykłych (ok. 35% więcej ofert), zablokowane rangą pojawiają się rzadko jako zachęta. Kontrakty mogą wymagać naczepy specjalnej. Giełda pokazuje, czy zestaw się nadaje („wymaga naczepy: chłodnia”, „kierowca bez ADR”), a naczepę zmienia się w Szczegółach stojącego zestawu.
+**Naczepy i ładunki specjalne** (`data/trailers.ts`, ładunki w `data/flavor.ts`): plandeka wozi większość ładunków; chłodnia (od rangi 1, +6% paliwa), cysterna ADR (od rangi 2, kierowca z kursem ADR, częstsze kontrole) i niskopodwozie na gabaryty (od rangi 3, wolniej, doświadczenie min. 55) są droższe, a ich ładunki płacą ok. 25–45% lepiej. Ładunki specjalne wiszą na giełdzie obok zwykłych (ok. 35% więcej ofert), zablokowane rangą pojawiają się rzadko jako zachęta. Kontrakty mogą wymagać naczepy specjalnej. Giełda pokazuje, czy zestaw się nadaje („wymaga naczepy: chłodnia”, „kierowca bez ADR”), a naczepę zmienia się w zakładce Naczepy albo w Szczegółach stojącego zestawu.
 
 **Rozwój kierowców** (`engine/training.ts`): cztery szkolenia (eco-driving, tachograf i przepisy, ODTJ, „zdrowy sen i kręgosłup”) podnoszą statystykę, coraz mniej przy wysokim poziomie i kolejnych powtórkach (maks. 3). Kursy mogą wyleczyć zły perk („Ciężka noga”, „Zapominalski”, „Kocha MOP-y”), a ODTJ zamienia czasem „Pirata drogowego” w „Byłego rajdowca”. Na czas szkolenia auto zostaje bez kierowcy. Perki przychodzą też z doświadczeniem: „Zna skróty” po 50 tys. km, „Ulubieniec magazynierów” przy wielu kursach bez spóźnień, „Teczka z papierami” po długim przebiegu bez mandatów; „Pechowiec” i „Maruda” mogą zniknąć.
 
@@ -104,12 +111,12 @@ Przy obecnym balansie prosty bot dochodzi do „Przewoźnika krajowego” po ok.
 - **Kierowca:** doświadczenie (prędkość), eco-driving (spalanie), niezawodność (kontrole ITD), kondycja (ryzyko zaspania), morale (mnożnik niezawodności, spada przy spóźnieniach i bezczynności). Pensja dzienna, przebieg, licznik czasu jazdy przechodzący między kursami.
 - **Perki kierowców** (`data/perks.ts`): 1–3 cechy specjalne obok statystyk, np. „Złota rączka” (awarie o połowę rzadziej), „Zna skróty”, „Ulubieniec magazynierów” (+1 reputacji za terminowy kurs), „Ciężka noga”, „Zapominalski”, „Pirat drogowy” (szybciej, ale więcej mandatów). Im lepszy kierowca, tym więcej perków i większa szansa, że są pozytywne; perki zmieniają też oczekiwaną pensję. Działają w `engine/effects.ts` (`perkMods`).
 - **Zdarzenia z decyzją** (`engine/roadEvents.ts`): karambol, kontrola ITD bez papierów, kontrolka silnika, zmęczenie, dodatkowy rozładunek, grzechot w naczepie, tania stacja, pies na MOP-ie. Gdy gracz patrzy, kierowca „dzwoni”, a zegar gry czeka na wybór. W tle i podczas nieobecności kierowca decyduje sam według swoich perków i statystyk (to samo można włączyć na stałe w zakładce Firma). Wynik wstawia postój do harmonogramu kursu (`delayTrip`), a zdarzenia w kolejce same się przeplanowują.
-- **Ciągnik:** marka i model, norma Euro (myto), spalanie, przebieg, zużycie (awarie, spalanie), leasing, serwis.
+- **Ciągnik:** marka i model, norma Euro (myto), spalanie, przebieg, zużycie (awarie, spalanie), kupno albo leasing, wartość rynkowa, serwis.
 - **Przepisy:** 4,5 h jazdy / 45 min przerwy, 9 h jazdy / 11 h odpoczynku. Uproszczenia opisane w `drivingRules.ts`.
 - **Ekonomia:** fracht, paliwo, myto, pensje, leasing, naprawy, mandaty, kary za spóźnienie. Struktura kosztów na dashboardzie.
 - **Giełda:** zlecenia generowane proceduralnie, z terminami i wyceną dla wybranego zestawu (dojazd, ETA, zysk, czy zdąży).
 - **Portrety kierowców** (`ui/portrait.ts`): własny generator pikselowych portretów 32×32 w duchu ETS2, bez plików graficznych. Kształt twarzy i szczęki, fryzury (także zakola i łysina), zarost (wąs, broda, kilkudniowy zarost), czapki, okulary, robocze ciuchy (flanela, kamizelka odblaskowa, kurtka, bluza). Wygląd jest stały dla osoby (ziarno z imienia, nazwiska i ksywki) i podąża za kierowcą: siwizna i zmarszczki u doświadczonych, okulary u „Teczki z papierami”, ciemne okulary u pirata; mina, brwi i cienie pod oczami zmieniają się z morale.
-- **Pikselowe ciągniki** (`ui/truckSprite.ts`): generator ciągników siodłowych z boku (44×28) do floty i salonu. Sylwetka kabiny zależy od marki (wysokość dachu, pochylenie przodu, zaokrąglenie, spojler DAFF-a, osłony boczne), lakier, pas i wydech od tablicy rejestracyjnej (stałe dla auta). Zużycie płowi lakier, dodaje rdzę i brud, nowe auta błyszczą.
+- **Pikselowe ciągniki** (`ui/truckSprite.ts`): generator ciągników siodłowych z boku (44×28) do floty i rynku. Naczepy mają własne pikselowe sylwetki (`ui/trailerSprite.ts`): firanka, chłodnia z agregatem, beczka ADR, niskopodwozie. Sylwetka kabiny zależy od marki (wysokość dachu, pochylenie przodu, zaokrąglenie, spojler DAFF-a, osłony boczne), lakier, pas i wydech od tablicy rejestracyjnej (stałe dla auta). Zużycie płowi lakier, dodaje rdzę i brud, nowe auta błyszczą.
 - **Humor:** parodie marek, klienci, ładunki, zdarzenia drogowe i biurowe w `data/flavor.ts`, oparte na gwarze CB-radia i realiach z trasy (misie z suszarką, nabita puszka, Kaśka, wahadełko, maślanka, lemoniada, „szerokości”, awizacje, wymiana palet, dziadtransy). Kierowcy czasem odzywają się na CB przy wyjeździe, mają wymówki przy spóźnieniach, a zdarzenia z decyzją obejmują też kolejkę pod rampą, wymianę palet i autostopowicza.
 
 Wszystkie liczby balansu są w `data/balance.ts`. Wartości rynkowe (diesel, e-TOLL, stawki) to robocze przybliżenia do kalibracji. Obecnie prosty bot z `sim:year` (logika w `tools/bot.ts`) rośnie w rok do 12 aut, więc rozsądny gracz zarabia więcej, a nieuważny bankrutuje.
@@ -119,14 +126,11 @@ Wszystkie liczby balansu są w `data/balance.ts`. Wartości rynkowe (diesel, e-T
 ## Świadome uproszczenia prototypu
 
 - Trasy są policzone tylko między 13 miastami MVP. Nowe miasta wymagają ponownego uruchomienia workflow tras (do tego czasu: linia prosta × 1,15).
-- Brak naczep, ADR, chłodni.
 - Brak bankructwa, kredytu i limitów tygodniowych czasu jazdy.
 
 ## Następne kroki
 
-1. Kontrakty ze stałymi klientami (regularne trasy, pewna stawka, kary za zawalenie).
-2. Licencja międzynarodowa (otwiera Europę).
-3. Kupno aut zamiast leasingu i rynek wtórny.
-4. Finanse: kredyt, faktury z terminem płatności (zatory płatnicze!), bankructwo.
-5. Europa: kraje, waluty, myto, ceny paliwa, kabotaż, zakazy weekendowe, języki kierowców. Razem z Europą **podwójna obsada**: drugi kierowca w zestawie (pauza 45 min w jadącym aucie, 9 h odpoczynku na postoju w ciągu 30 h, ok. 1,7× więcej km na dobę), ekspresy z wyższą stawką i dopasowanie charakterów w parze (morale).
-6. Osiągnięcia i więcej zdarzeń.
+1. Licencja międzynarodowa (otwiera Europę).
+2. Finanse: kredyt, faktury z terminem płatności (zatory płatnicze!), bankructwo.
+3. Europa: kraje, waluty, myto, ceny paliwa, kabotaż, zakazy weekendowe, języki kierowców. Razem z Europą **podwójna obsada**: drugi kierowca w zestawie (pauza 45 min w jadącym aucie, 9 h odpoczynku na postoju w ciągu 30 h, ok. 1,7× więcej km na dobę), ekspresy z wyższą stawką i dopasowanie charakterów w parze (morale).
+4. Osiągnięcia i więcej zdarzeń.

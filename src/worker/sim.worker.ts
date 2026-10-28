@@ -105,8 +105,11 @@ const api: SimApi = {
   hireDriver: (id) => act(() => E.hireDriver(state!, id)),
   fireDriver: (id) => act(() => E.fireDriver(state!, id)),
   assignDriver: (truckId, driverId) => act(() => E.assignDriver(state!, truckId, driverId)),
-  leaseOffer: (id) => act(() => E.leaseOffer(state!, id)),
-  returnTruck: (id) => act(() => E.returnTruck(state!, id)),
+  acquireTruck: (id, mode) => act(() => E.acquireTruck(state!, id, mode)),
+  acquireTrailer: (id, mode) => act(() => E.acquireTrailer(state!, id, mode)),
+  disposeTruck: (id) => act(() => E.disposeTruck(state!, id)),
+  disposeTrailer: (id) => act(() => E.disposeTrailer(state!, id)),
+  attachTrailer: (truckId, trailerId) => act(() => E.attachTrailer(state!, truckId, trailerId)),
   upgradeYard: () => act(() => E.upgradeYard(state!)),
   buyUpgrade: (id) => act(() => E.buyUpgrade(state!, id)),
   setAutoDispatch: (on) => act(() => E.setAutoDispatch(state!, on)),
@@ -114,7 +117,6 @@ const api: SimApi = {
   setAskDecisions: (on) => act(() => E.setAskDecisions(state!, on)),
   signContract: (id) => act(() => E.signContract(state!, id)),
   setTutorial: (t) => act(() => E.setTutorial(state!, t)),
-  setTrailer: (truckId, type) => act(() => E.setTrailer(state!, truckId, type)),
   trainDriver: (driverId, courseId) => act(() => E.trainDriver(state!, driverId, courseId)),
   newGame(seed) {
     state = newGame(seed ?? ((Math.random() * 2 ** 31) | 0));

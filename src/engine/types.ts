@@ -5,7 +5,7 @@ import type { DutyState } from './drivingRules';
 import type { Queue } from './queue';
 import type { RngState } from './rng';
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 /** Wszystkie statystyki 0–100. Każda na coś wpływa (patrz engine/effects.ts). */
 export interface DriverStats {
@@ -64,17 +64,45 @@ export interface Truck {
   /** Kaucja leasingowa wpłacona przy odbiorze (przepada przy wcześniejszym zwrocie). */
   deposit?: number;
   condition?: TruckCondition;
-  /** Podpięta naczepa (brak = plandeka). */
+  /** Leasing (rata dzienna) albo własny (bez raty, można sprzedać). Brak = leasing (stare zapisy). */
+  ownership?: Ownership;
+  /** Cena nowego egzemplarza tego modelu: od niej liczy się wartość auta. */
+  newPrice?: number;
+  /** Podpięta naczepa (id) i jej typ, powielony dla szybkich obliczeń. */
+  trailerId?: string | null;
   trailer?: TrailerType;
 }
 
 export type TruckCondition = 'new' | 'used';
+export type Ownership = 'lease' | 'own';
 
-/** Oferta z salonu: auto jeszcze bez lokalizacji i kierowcy. */
-export type TruckOffer = Omit<Truck, 'cityId' | 'driverId' | 'tripId' | 'serviceUntil'> & {
+/** Oferta z rynku: auto jeszcze bez lokalizacji, kierowcy i naczepy. */
+export type TruckOffer = Omit<Truck, 'cityId' | 'driverId' | 'tripId' | 'serviceUntil' | 'trailerId' | 'trailer' | 'ownership'> & {
   deposit: number;
   condition: TruckCondition;
+  newPrice: number;
+  /** Cena zakupu. */
+  buyPrice: number;
 };
+
+export interface Trailer {
+  id: string;
+  /** Krótki numer do rozpoznania na liście, np. „N-07”. */
+  label: string;
+  type: TrailerType;
+  condition: TruckCondition;
+  ownership: Ownership;
+  /** Rata dzienna (tylko leasing). */
+  leasePerDay: number;
+  deposit: number;
+  newPrice: number;
+  wear: number;
+  km: number;
+  /** Ciągnik, do którego jest podpięta, albo null (stoi na placu). */
+  truckId: string | null;
+}
+
+export type TrailerOffer = Omit<Trailer, 'truckId' | 'ownership' | 'km' | 'label'> & { buyPrice: number };
 
 export interface BaseState {
   /** Poziom placu (indeks w YARD). */
@@ -216,7 +244,7 @@ export interface GameState {
   now: number;
   cash: number;
   companyName: string;
-  /** Siedziba firmy: tu odbiera się auta z salonu i stąd częściej startują zlecenia. */
+  /** Siedziba firmy: tu odbiera się kupiony sprzęt i stąd częściej startują zlecenia. */
   hqCityId?: string;
   trucks: Truck[];
   drivers: Driver[];
@@ -233,13 +261,15 @@ export interface GameState {
   base: BaseState;
   /** Kandydaci na kierowców (rynek pracy). */
   candidates: Driver[];
-  /** Oferty salonu (leasing). */
+  /** Oferty ciągników (kupno albo leasing). */
   truckOffers: TruckOffer[];
   settings: GameSettings;
   /** Zdarzenia na trasie czekające na decyzję gracza (zegar stoi, dopóki ich nie rozstrzygnie). */
   decisions: PendingDecision[];
   contracts: Contract[];
   contractOffers: ContractOffer[];
+  trailers: Trailer[];
+  trailerOffers: TrailerOffer[];
 }
 
 export interface GameSettings {

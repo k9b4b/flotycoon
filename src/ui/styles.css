@@ -847,3 +847,39 @@ select {
 .badge.t-adr { color: #ff8f3a; border-color: #ff8f3a; }
 .badge.t-lowbed { color: #c9a0ff; border-color: #c9a0ff; }
 .trailer-desc { font-size: 12px; margin-top: 4px; }
+
+/* ── Rynek: ciągniki i naczepy ─────────────────────────────── */
+.seg { display: flex; gap: 4px; padding: 3px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; }
+.seg button { flex: 1; font: inherit; font-size: 13px; padding: 7px 8px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; }
+.seg button.on { background: var(--panel); color: var(--text); box-shadow: 0 0 0 1px var(--line-strong) inset; }
+.market-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 12px; }
+.offer-card.is-locked { opacity: 0.72; }
+.offer-head { display: flex; align-items: center; gap: 12px; }
+.offer-title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 14px; min-width: 0; }
+.offer-title strong { margin-right: 2px; }
+.offer-desc { margin: 0; font-size: 12px; line-height: 1.4; }
+.trailer-sprite, .truck-sprite { flex: none; display: inline-block; image-rendering: pixelated; }
+.spec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 6px; }
+.spec { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--line); min-width: 0; }
+.spec-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.spec-value { font-size: 13px; color: var(--text); }
+.spec-value .wear-label { gap: 6px; }
+.buy-lease { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.deal { font: inherit; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line-strong); background: var(--panel); color: var(--text); cursor: pointer; text-align: left; }
+.deal:hover:not(:disabled) { border-color: var(--accent); }
+.deal:disabled { opacity: 0.45; cursor: not-allowed; }
+.deal strong { font-size: 15px; }
+.deal-kind { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.deal-buy .deal-kind { color: var(--good); }
+.deal-lease .deal-kind { color: var(--accent); }
+.deal-sub { font-size: 11px; color: var(--muted); }
+.deal.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; background: linear-gradient(180deg, rgba(245, 165, 36, 0.08), var(--panel) 70%); }
+.deal-note { font-size: 12px; }
+.setup-mode { max-width: 520px; }
+.trailer-actions { margin-top: 6px; }
+.btn.armed { background: var(--bad, #e5534b); color: #fff; border-color: transparent; }
+@media (max-width: 420px) {
+  .area-fleet .subtabs { gap: 0; padding-inline: 4px; }
+  .area-fleet .subtabs button { padding-inline: 7px; }
+  .area-fleet .subtabs .num { margin-left: 0; }
+}

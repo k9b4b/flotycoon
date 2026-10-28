@@ -1,6 +1,8 @@
 import type { Driver } from '../engine/types';
 import { portraitSvg } from './portrait';
 import { truckSvg, type TruckLook } from './truckSprite';
+import { trailerSvg, TRAILER_SPRITE_SIZE } from './trailerSprite';
+import type { TrailerType } from '../data/trailers';
 
 /**
  * Pikselowy portret kierowcy (ui/portrait.ts), z pamięcią podręczną: generujemy raz na osobę i nastrój.
@@ -34,4 +36,16 @@ export function TruckSprite({ t, scale = 2 }: { t: TruckLook; scale?: number }) 
     truckCache.set(key, svg);
   }
   return <span className="truck-sprite" style={{ width: 44 * scale, height: 28 * scale }} aria-hidden dangerouslySetInnerHTML={{ __html: svg }} />;
+}
+
+/** Pikselowa naczepa (ui/trailerSprite.ts). */
+export function TrailerSprite({ type, wear = 0, scale = 2 }: { type: TrailerType; wear?: number; scale?: number }) {
+  return (
+    <span
+      className="trailer-sprite"
+      style={{ width: TRAILER_SPRITE_SIZE.w * scale, height: TRAILER_SPRITE_SIZE.h * scale }}
+      aria-hidden
+      dangerouslySetInnerHTML={{ __html: trailerSvg(type, wear) }}
+    />
+  );
 }

@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { BALANCE } from '../../data/balance';
 import type { CourseId } from '../../data/development';
-import { RANKS } from '../../data/progression';
-import { TRAILER_LIST, TRAILERS, type TrailerType } from '../../data/trailers';
+import { TRAILERS } from '../../data/trailers';
 import { CITY_BY_ID } from '../../data/cities';
 import { MARKETS } from '../../data/progression';
+import type { Ownership } from '../../engine/types';
 import { dutyAfterIdle } from '../../engine/drivingRules';
 import { formatClock, formatDuration, formatGameTime } from '../../engine/time';
 import type { Snapshot, TruckView } from '../../engine/view';
@@ -12,10 +12,11 @@ import { city, km, pct, pln } from '../format';
 import { PerkList, ScoreBadge, StatBars, TraitChips, wearColor } from './driverUi';
 import { DriverPicker } from './Pairing';
 import { DriverAvatar, TruckSprite } from '../avatar';
-import { CandidatesList, DriversList, Showroom } from './Staffing';
+import { DriversList } from './Staffing';
+import { ConfirmButton, TrailersList, VehicleMarket, type MarketSeg } from './Market';
 
 /**
- * Flota w czterech widokach: zestawy (co jeździ), kierowcy (kadry), rynek pracy i salon aut.
+ * Flota w czterech widokach: zestawy (co jeździ), kierowcy, naczepy i rynek (ciągniki, naczepy, kandydaci).
  * Karta zestawu: najpierw kto i czym jedzie, potem co robi teraz; szczegóły zwinięte.
  */
 
@@ -28,10 +29,12 @@ export interface FleetActions {
   hire: (candidateId: string) => void;
   fire: (driverId: string) => void;
   assign: (truckId: string, driverId: string | null) => void;
-  lease: (offerId: string) => void;
-  returnTruck: (truckId: string) => void;
+  acquireTruck: (offerId: string, mode: Ownership) => void;
+  acquireTrailer: (offerId: string, mode: Ownership) => void;
+  disposeTruck: (truckId: string) => void;
+  disposeTrailer: (trailerId: string) => void;
+  attachTrailer: (truckId: string, trailerId: string | null) => void;
   train: (driverId: string, courseId: CourseId) => void;
-  trailer: (truckId: string, type: TrailerType) => void;
 }
 
 const stop = (fn: () => void) => (e: { stopPropagation(): void }) => {
@@ -39,7 +42,25 @@ const stop = (fn: () => void) => (e: { stopPropagation(): void }) => {
   fn();
 };
 
-function StatusBlock({ t, snap, a, onStaff }: { t: TruckView; snap: Snapshot; a: FleetActions; onStaff: () => void }) {
+/** Wybór naczepy dla stojącego ciągnika: wolne naczepy i te z innych stojących zestawów (zamiana). */
+function TrailerPicker({ t, snap, a, placeholder }: { t: TruckView; snap: Snapshot; a: FleetActions; placeholder: string }) {
+  const options = snap.trailers.filter((v) => !v.onTrip && v.trailer.id !== t.truck.trailerId);
+  if (options.length === 0) return null;
+  options.sort((x, y) => Number(!!x.truckId) - Number(!!y.truckId));
+  return (
+    <select className="pair-select" value="" aria-label="Naczepa" onClick={(e) => e.stopPropagation()} onChange={(e) => e.target.value && a.attachTrailer(t.truck.id, e.target.value)}>
+      <option value="">{placeholder}</option>
+      {options.map((v) => (
+        <option key={v.trailer.id} value={v.trailer.id}>
+          {TRAILERS[v.trailer.type].name} {v.trailer.label} · zużycie {pct(v.trailer.wear)}
+          {v.truckLabel ? ` (zamiana z ${v.truckLabel})` : ' (na placu)'}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function StatusBlock({ t, snap, a, onStaff, onMarket }: { t: TruckView; snap: Snapshot; a: FleetActions; onStaff: () => void; onMarket: () => void }) {
   const now = snap.now;
   const { trip, truck } = t;
 
@@ -60,7 +81,7 @@ function StatusBlock({ t, snap, a, onStaff }: { t: TruckView; snap: Snapshot; a:
         <div className="fc-status-line">
           <strong>Stoi bez kierowcy: {CITY_BY_ID[truck.cityId].name}</strong>
         </div>
-        <div className="fc-idle-cost">Rata leasingu idzie dalej: {pln(truck.leasePerDay)}/dzień</div>
+        <div className="fc-idle-cost">Zarabia zero, a koszty stałe lecą: {pln(t.costPerHour * 24)}/dzień</div>
         <div className="fc-actions" onClick={(e) => e.stopPropagation()}>
           {snap.drivers.some((d) => !d.onTrip) ? (
             <DriverPicker snap={snap} t={t} a={a} placeholder="Przypisz kierowcę…" />
@@ -69,6 +90,23 @@ function StatusBlock({ t, snap, a, onStaff }: { t: TruckView; snap: Snapshot; a:
               Zatrudnij kierowcę
             </button>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  if (t.status === 'notrailer') {
+    return (
+      <div className="fc-status fc-idle">
+        <div className="fc-status-line">
+          <strong>Stoi bez naczepy: {CITY_BY_ID[truck.cityId].name}</strong>
+        </div>
+        <div className="fc-idle-cost">Bez naczepy nie weźmie żadnego zlecenia.</div>
+        <div className="fc-actions" onClick={(e) => e.stopPropagation()}>
+          <TrailerPicker t={t} snap={snap} a={a} placeholder="Podepnij naczepę…" />
+          <button className={`btn small${snap.trailers.some((v) => !v.truckId) ? '' : ' primary'}`} onClick={onMarket}>
+            Rynek naczep
+          </button>
         </div>
       </div>
     );
@@ -177,28 +215,30 @@ function Details({ t, snap, a }: { t: TruckView; snap: Snapshot; a: FleetActions
         <dd className="num">
           {truck.condition === 'new' ? 'Nowe · ' : ''}Euro {truck.euro} · {km(truck.odometerKm)} · {truck.fuelL100} l/100
         </dd>
-        <dt>Leasing</dt>
-        <dd className="num">
-          {pln(truck.leasePerDay)}/dzień{truck.trailer && truck.trailer !== 'curtain' ? ` + naczepa ${pln(TRAILERS[truck.trailer].leasePerDay)}` : ''}
-        </dd>
+        <dt>{truck.ownership === 'own' ? 'Własne' : 'Leasing'}</dt>
+        <dd className="num">{truck.ownership === 'own' ? `wartość ${pln(t.value ?? 0)}` : `${pln(truck.leasePerDay)}/dzień`}</dd>
         <dt>Naczepa</dt>
         <dd>
-          <select
-            className="pair-select"
-            value={truck.trailer ?? 'curtain'}
-            disabled={!!t.trip}
-            aria-label="Naczepa"
-            onChange={(e) => a.trailer(truck.id, e.target.value as TrailerType)}
-          >
-            {TRAILER_LIST.map((tr) => (
-              <option key={tr.id} value={tr.id} disabled={snap.company.rank < tr.rank}>
-                {tr.name}
-                {tr.leasePerDay ? ` · ${pln(tr.leasePerDay)}/dzień, podpięcie ${pln(tr.swapFee)}` : ' · w pakiecie'}
-                {snap.company.rank < tr.rank ? ` · od rangi „${RANKS[tr.rank].name}”` : ''}
-              </option>
-            ))}
-          </select>
-          <div className="muted trailer-desc">{TRAILERS[truck.trailer ?? 'curtain'].desc}</div>
+          {t.trailer ? (
+            <>
+              {TRAILERS[t.trailer.type].name} <span className="plate">{t.trailer.label}</span>{' '}
+              <span className="muted num">
+                · zużycie {pct(t.trailer.wear)} · {t.trailer.ownership === 'own' ? 'własna' : `${pln(t.trailer.leasePerDay)}/dzień`}
+              </span>
+            </>
+          ) : (
+            <span className="bad">brak</span>
+          )}
+          {idle && (
+            <div className="fc-actions trailer-actions">
+              <TrailerPicker t={t} snap={snap} a={a} placeholder={t.trailer ? 'Zmień naczepę…' : 'Podepnij naczepę…'} />
+              {t.trailer && (
+                <button className="btn small" onClick={() => a.attachTrailer(truck.id, null)}>
+                  Odepnij
+                </button>
+              )}
+            </div>
+          )}
         </dd>
       </dl>
       {d && <p className="quirk">{d.quirk}</p>}
@@ -210,9 +250,16 @@ function Details({ t, snap, a }: { t: TruckView; snap: Snapshot; a: FleetActions
               Zdejmij kierowcę
             </button>
           )}
-          <button className="btn small danger" onClick={() => a.returnTruck(truck.id)} title="Kaucja przepada">
-            Zwróć auto (kara {pln(truck.leasePerDay * MARKETS.returnPenaltyDays)})
-          </button>
+          {truck.ownership === 'own' ? (
+            <ConfirmButton label={`Sprzedaj · ${pln(t.value ?? 0)}`} confirm="Na pewno sprzedać?" onConfirm={() => a.disposeTruck(truck.id)} title="Kierowca i naczepa zostają w firmie" />
+          ) : (
+            <ConfirmButton
+              label={`Zwróć z leasingu · kara ${pln(truck.leasePerDay * MARKETS.returnPenaltyDays)}`}
+              confirm="Na pewno zwrócić?"
+              onConfirm={() => a.disposeTruck(truck.id)}
+              title="Kaucja przepada. Kierowca i naczepa zostają w firmie."
+            />
+          )}
         </div>
       )}
     </div>
@@ -227,6 +274,7 @@ function TruckCard({
   a,
   onToggle,
   onStaff,
+  onMarket,
 }: {
   t: TruckView;
   snap: Snapshot;
@@ -235,18 +283,20 @@ function TruckCard({
   a: FleetActions;
   onToggle: () => void;
   onStaff: () => void;
+  onMarket: () => void;
 }) {
   const { truck, driver } = t;
   const cls = [
     'fleet-card',
     selected && 'selected',
-    (t.status === 'idle' || t.status === 'nodriver') && 'is-idle',
+    (t.status === 'idle' || t.status === 'nodriver' || t.status === 'notrailer') && 'is-idle',
     t.status === 'incident' && 'is-incident',
   ]
     .filter(Boolean)
     .join(' ');
   const plateWear = (
     <>
+      {!truck.trailerId && <span className="badge bad">bez naczepy</span>}
       {truck.trailer && truck.trailer !== 'curtain' && (
         <span className={`badge trailer t-${truck.trailer}`} title={TRAILERS[truck.trailer].desc}>
           + {TRAILERS[truck.trailer].short}
@@ -295,6 +345,7 @@ function TruckCard({
           <TruckSprite t={truck} />
           {t.status === 'idle' && <span className="fc-pill">Wolny</span>}
           {t.status === 'nodriver' && <span className="fc-pill">Bez kierowcy</span>}
+          {t.status === 'notrailer' && <span className="fc-pill">Bez naczepy</span>}
         </div>
       </header>
       {/* Na telefonie auto ma osobny wiersz pod kierowcą, żeby nagłówek nie był ściśnięty. */}
@@ -308,7 +359,7 @@ function TruckCard({
         </div>
       </div>
 
-      <StatusBlock t={t} snap={snap} a={a} onStaff={onStaff} />
+      <StatusBlock t={t} snap={snap} a={a} onStaff={onStaff} onMarket={onMarket} />
 
       <footer className="fc-foot">
         {driver ? <TraitChips d={driver} /> : <span style={{ flex: 1 }} />}
@@ -327,20 +378,25 @@ function TruckCard({
 
 /** Wolni i bez kierowcy najpierw (najdłużej stojący na górze), potem zdarzenia, potem wg ETA, serwis na końcu. */
 function order(t: TruckView): number {
-  if (t.status === 'nodriver') return -2e9;
+  if (t.status === 'nodriver' || t.status === 'notrailer') return -2e9;
   if (t.status === 'idle') return -1e9 + (t.idleSince ?? 0);
   if (t.status === 'incident') return -1e8;
   if (t.status === 'service') return 1e12;
   return t.trip?.eta ?? 0;
 }
 
-type View = 'trucks' | 'drivers' | 'hire' | 'showroom';
+type View = 'trucks' | 'drivers' | 'trailers' | 'market';
 
 export function FleetPanel({ snap, selectedId, a }: { snap: Snapshot; selectedId: string | null; a: FleetActions }) {
   const [view, setView] = useState<View>('trucks');
+  const [seg, setSeg] = useState<MarketSeg>('trucks');
+  const openMarket = (sg: MarketSeg) => {
+    setSeg(sg);
+    setView('market');
+  };
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const fleet = [...snap.fleet].sort((x, y) => order(x) - order(y));
-  const idle = snap.fleet.filter((t) => t.status === 'idle' || t.status === 'nodriver').length;
+  const idle = snap.fleet.filter((t) => t.status === 'idle' || t.status === 'nodriver' || t.status === 'notrailer').length;
   const service = snap.fleet.filter((t) => t.status === 'service').length;
   const moving = snap.fleet.length - idle - service;
   const { fleetCap, driverCap } = snap.company;
@@ -355,8 +411,8 @@ export function FleetPanel({ snap, selectedId, a }: { snap: Snapshot; selectedId
   const tabs: { id: View; label: string; count?: string }[] = [
     { id: 'trucks', label: 'Zestawy', count: `${snap.fleet.length}/${fleetCap}` },
     { id: 'drivers', label: 'Kierowcy', count: `${snap.drivers.length}/${driverCap}` },
-    { id: 'hire', label: 'Rynek pracy', count: String(snap.candidates.length) },
-    { id: 'showroom', label: 'Salon', count: String(snap.truckOffers.length) },
+    { id: 'trailers', label: 'Naczepy', count: `${snap.trailers.length}/${snap.trailerCap}` },
+    { id: 'market', label: 'Rynek' },
   ];
 
   return (
@@ -372,7 +428,7 @@ export function FleetPanel({ snap, selectedId, a }: { snap: Snapshot; selectedId
       <div className="subtabs" role="tablist" aria-label="Widok floty">
         {tabs.map((t) => (
           <button key={t.id} role="tab" aria-selected={view === t.id} className={view === t.id ? 'on' : ''} onClick={() => setView(t.id)}>
-            {t.label} <span className="num muted">{t.count}</span>
+            {t.label} {t.count && <span className="num muted">{t.count}</span>}
           </button>
         ))}
       </div>
@@ -387,12 +443,13 @@ export function FleetPanel({ snap, selectedId, a }: { snap: Snapshot; selectedId
               expanded={expanded.has(t.truck.id)}
               a={a}
               onToggle={() => toggle(t.truck.id)}
-              onStaff={() => setView('hire')}
+              onStaff={() => openMarket('drivers')}
+              onMarket={() => openMarket('trailers')}
             />
           ))}
-        {view === 'drivers' && <DriversList snap={snap} a={a} onHire={() => setView('hire')} />}
-        {view === 'hire' && <CandidatesList snap={snap} a={a} />}
-        {view === 'showroom' && <Showroom snap={snap} a={a} />}
+        {view === 'drivers' && <DriversList snap={snap} a={a} onHire={() => openMarket('drivers')} />}
+        {view === 'trailers' && <TrailersList snap={snap} a={a} onMarket={() => openMarket('trailers')} />}
+        {view === 'market' && <VehicleMarket snap={snap} a={a} seg={seg} setSeg={setSeg} />}
       </div>
     </section>
   );

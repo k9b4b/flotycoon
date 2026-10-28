@@ -15,8 +15,10 @@ import {
   driverCap,
   fleetCap,
   hireDriver,
+  acquireTrailer,
+  acquireTruck,
+  attachTrailer,
   isAvailable,
-  leaseOffer,
   rankIndex,
   serviceQuote,
   serviceTruck,
@@ -25,7 +27,8 @@ import {
 } from '../src/engine/sim';
 import type { GameState } from '../src/engine/types';
 
-const fixedPerDay = (s: GameState) => s.drivers.reduce((a, d) => a + d.salaryPerDay, 0) + s.trucks.reduce((a, t) => a + t.leasePerDay, 0);
+const fixedPerDay = (s: GameState) =>
+  s.drivers.reduce((a, d) => a + d.salaryPerDay, 0) + s.trucks.reduce((a, t) => a + t.leasePerDay, 0) + s.trailers.reduce((a, t) => a + t.leasePerDay, 0);
 
 /** Jeden „obchód” bota: zlecenia, serwisy, rozwój. Wołać co godzinę gry. */
 export function botTick(s: GameState, opts: { grow?: boolean } = {}) {
@@ -56,7 +59,7 @@ export function botTick(s: GameState, opts: { grow?: boolean } = {}) {
       (c.stats.experience + c.stats.eco + c.stats.reliability + c.stats.stamina) / c.salaryPerDay;
     const cand = [...s.candidates].sort((a, b) => value(b) - value(a))[0];
     if (offer && cand) {
-      leaseOffer(s, offer.id);
+      acquireTruck(s, offer.id, 'lease');
       hireDriver(s, cand.id);
     }
   }
@@ -65,6 +68,16 @@ export function botTick(s: GameState, opts: { grow?: boolean } = {}) {
   for (const o of s.contractOffers.filter((x) => !x.trailer)) {
     if (s.trucks.length < 4 || activeContracts(s).length >= Math.min(maxContracts(s), Math.floor(s.trucks.length / 3))) break;
     signContract(s, o.id);
+  }
+  // Każdy ciągnik potrzebuje naczepy: bot bierze najtańszą plandekę w leasingu i podpina.
+  for (const t of s.trucks.filter((x) => !x.trailerId && !x.tripId)) {
+    let free = s.trailers.find((tr) => !tr.truckId && tr.type === 'curtain');
+    if (!free) {
+      const o = [...s.trailerOffers].filter((x) => x.type === 'curtain').sort((a, b) => a.leasePerDay - b.leasePerDay)[0];
+      if (!o || acquireTrailer(s, o.id, 'lease').ok === false) break;
+      free = s.trailers[s.trailers.length - 1];
+    }
+    attachTrailer(s, t.id, free.id);
   }
   // Gra nie łączy par sama: bot sadza wolnych kierowców w puste auta na placu.
   const freeDrivers = s.drivers.filter((d) => !truckOfDriver(s, d));

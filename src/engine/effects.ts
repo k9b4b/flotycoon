@@ -69,7 +69,7 @@ function fill(text: string, d: Driver): string {
 }
 
 /** Losuje zdarzenia drogowe dla kursu z góry. Wynik trafia do harmonogramu. */
-export function rollIncidents(r: RngState, truck: Truck, d: Driver, totalKm: number): PlannedIncident[] {
+export function rollIncidents(r: RngState, truck: Truck, d: Driver, totalKm: number, trailerWear = 0): PlannedIncident[] {
   const out: PlannedIncident[] = [];
   const at = () => randRange(r, 0.1, 0.9) * totalKm;
   const longTrip = Math.min(1.5, totalKm / 350);
@@ -78,7 +78,8 @@ export function rollIncidents(r: RngState, truck: Truck, d: Driver, totalKm: num
   if (chance(r, 0.3 * longTrip * m.trafficMul)) {
     out.push({ atKm: at(), min: randInt(r, 20, 100), info: { kind: 'traffic', text: fill(pick(r, INCIDENTS.traffic), d), cost: 0, tone: 'funny' } });
   }
-  if (chance(r, (0.02 + truck.wear * truck.wear * 0.35) * longTrip * m.breakdownMul)) {
+  // Zużyta naczepa też potrafi stanąć (opony, hamulce), ale rzadziej niż ciągnik.
+  if (chance(r, (0.02 + truck.wear * truck.wear * 0.35 + trailerWear * trailerWear * 0.1) * longTrip * m.breakdownMul)) {
     const cost = Math.round(randInt(r, 600, 2800) * (1 + truck.wear));
     out.push({ atKm: at(), min: randInt(r, 90, 240), info: { kind: 'breakdown', text: fill(pick(r, INCIDENTS.breakdown), d), cost, tone: 'bad' } });
   }

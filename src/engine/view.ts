@@ -1,22 +1,23 @@
 import { BALANCE } from '../data/balance';
 import { CITY_BY_ID } from '../data/cities';
 import { kmAt, phaseAt } from './drivingRules';
-import { trailerOf } from './effects';
+import { sellPriceFor, trailerCap, trailerOfTruck, trailerValue, truckValue } from './assets';
 import { ROAD_EVENT_BY_ID, eventCtx, optionHint, optionLabel } from './roadEvents';
 import { RANKS, UPGRADES, YARD, type Upgrade } from '../data/progression';
 import { buildCost, driverCap, driverOfTruck, fleetCap, isAvailable, previewJob, rankIndex, serviceQuote, truckOfDriver, upgradesPerDay, type JobPreview } from './sim';
 import { maxContracts } from './contracts';
-import type { BaseState, Contract, ContractOffer, DayRecord, Driver, GameState, Job, LogEntry, Phase, PhaseKind, Truck, TruckOffer } from './types';
+import type { BaseState, Contract, ContractOffer, DayRecord, Driver, GameState, Job, LogEntry, Phase, PhaseKind, Trailer, TrailerOffer, Truck, TruckOffer } from './types';
 
 /**
  * Widok stanu dla UI. Worker wysyła go kilka razy na sekundę,
  * więc zawiera tylko to, co dashboard pokazuje (bez kolejki zdarzeń).
  */
 
-export type TruckStatus = PhaseKind | 'idle' | 'service' | 'nodriver';
+export type TruckStatus = PhaseKind | 'idle' | 'service' | 'nodriver' | 'notrailer';
 
 export const PHASE_LABEL: Record<TruckStatus, string> = {
   idle: 'Wolny',
+  notrailer: 'Bez naczepy',
   nodriver: 'Bez kierowcy',
   service: 'W serwisie',
   drive_empty: 'Dojazd na pusto',
@@ -32,6 +33,9 @@ export interface TruckView {
   truck: Truck;
   /** null = auto stoi na placu bez kierowcy. */
   driver: Driver | null;
+  trailer: Trailer | null;
+  /** Cena sprzedaży (auto własne) albo null (leasing). */
+  value: number | null;
   /** Numer zestawu w firmie (#1, #2…), stały: ten sam na karcie i na mapie. */
   fleetNo: number;
   /** Od kiedy zestaw stoi bez zlecenia (tylko gdy status = idle). */
@@ -69,6 +73,15 @@ export interface TruckView {
 
 export interface JobView extends Job {
   previews: JobPreview[];
+}
+
+export interface TrailerView {
+  trailer: Trailer;
+  truckId: string | null;
+  truckLabel: string | null;
+  onTrip: boolean;
+  /** Cena sprzedaży (własna) albo null (leasing). */
+  value: number | null;
 }
 
 export interface DriverView {
@@ -119,6 +132,9 @@ export interface Snapshot {
   drivers: DriverView[];
   candidates: Driver[];
   truckOffers: TruckOffer[];
+  trailerOffers: TrailerOffer[];
+  trailerCap: number;
+  trailers: TrailerView[];
   settings: GameState['settings'];
   /** Aktywne kontrakty i kilka ostatnio zakończonych. */
   contracts: Contract[];
@@ -167,7 +183,15 @@ function lerp(a: number, b: number, f: number) {
 
 function truckView(s: GameState, truck: Truck, fleetNo: number): TruckView {
   const driver = driverOfTruck(s, truck);
-  const base = { truck, driver, fleetNo, costPerHour: ((driver?.salaryPerDay ?? 0) + truck.leasePerDay + trailerOf(truck).leasePerDay) / 24 };
+  const trailer = trailerOfTruck(s, truck);
+  const base = {
+    truck,
+    driver,
+    trailer,
+    fleetNo,
+    value: truck.ownership === 'own' ? sellPriceFor(truckValue(truck)) : null,
+    costPerHour: ((driver?.salaryPerDay ?? 0) + truck.leasePerDay + (trailer?.leasePerDay ?? 0)) / 24,
+  };
   const here = CITY_BY_ID[truck.cityId];
   const serviceQuoteNow = serviceQuote(s, truck);
   if (truck.serviceUntil !== null) {
@@ -175,6 +199,9 @@ function truckView(s: GameState, truck: Truck, fleetNo: number): TruckView {
   }
   if (!truck.tripId && !driver) {
     return { ...base, status: 'nodriver', statusLabel: PHASE_LABEL.nodriver, lat: here.lat, lon: here.lon, serviceQuote: serviceQuoteNow };
+  }
+  if (!truck.tripId && !trailer) {
+    return { ...base, status: 'notrailer', statusLabel: PHASE_LABEL.notrailer, lat: here.lat, lon: here.lon, serviceQuote: serviceQuoteNow };
   }
   if (!truck.tripId && driver) {
     return {
@@ -272,7 +299,11 @@ export function buildSnapshot(s: GameState): Snapshot {
     today: s.today,
     totals: s.totals,
     costsByCategory: s.costsByCategory,
-    dailyFixedCosts: s.drivers.reduce((a, d) => a + d.salaryPerDay, 0) + s.trucks.reduce((a, t) => a + t.leasePerDay + trailerOf(t).leasePerDay, 0) + upgradesPerDay(s),
+    dailyFixedCosts:
+      s.drivers.reduce((a, d) => a + d.salaryPerDay, 0) +
+      s.trucks.reduce((a, t) => a + t.leasePerDay, 0) +
+      s.trailers.reduce((a, t) => a + t.leasePerDay, 0) +
+      upgradesPerDay(s),
     company: companyView(s),
     drivers: s.drivers.map((d) => {
       const t = truckOfDriver(s, d);
@@ -280,6 +311,18 @@ export function buildSnapshot(s: GameState): Snapshot {
     }),
     candidates: s.candidates,
     truckOffers: s.truckOffers,
+    trailerOffers: s.trailerOffers,
+    trailerCap: trailerCap(s),
+    trailers: s.trailers.map((tr) => {
+      const t = tr.truckId ? s.trucks.find((x) => x.id === tr.truckId) : null;
+      return {
+        trailer: tr,
+        truckId: t?.id ?? null,
+        truckLabel: t ? `#${fleetNo.get(t.id)} ${t.brand} ${t.model}` : null,
+        onTrip: !!t?.tripId,
+        value: tr.ownership === 'own' ? sellPriceFor(trailerValue(tr)) : null,
+      };
+    }),
     settings: s.settings,
     contracts: [...s.contracts.filter((c) => c.status === 'active'), ...s.contracts.filter((c) => c.status !== 'active').slice(-4).reverse()],
     contractOffers: s.contractOffers,

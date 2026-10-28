@@ -3,6 +3,7 @@ import { BALANCE } from '../../data/balance';
 import { CITIES } from '../../data/cities';
 import { hqProfile } from '../../data/hq';
 import type { SetupOptions } from '../../engine/sim';
+import type { Ownership } from '../../engine/types';
 import { DriverAvatar, TruckSprite } from '../avatar';
 import { km, pct, pln } from '../format';
 import { sim } from '../simClient';
@@ -26,7 +27,7 @@ function hqTraits(id: string): { text: string; good: boolean }[] {
   return out;
 }
 
-const TRUCK_TAGS = ['Najtańsza rata', 'Środek stawki', 'Najwyższa rata'];
+const TRUCK_TAGS = ['Tani i wyjeżdżony', 'Złoty środek', 'Prawie jak nowy'];
 const DRIVER_TAGS = ['Najtańszy, do wychowania', 'Złoty środek', 'Najlepszy z ogłoszeń'];
 
 const STEPS = ['Nazwa', 'Siedziba', 'Ciągnik', 'Kierowca'];
@@ -59,6 +60,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   const [hq, setHq] = useState('WAW');
   const [truckIdx, setTruckIdx] = useState(1);
   const [driverIdx, setDriverIdx] = useState(1);
+  const [mode, setMode] = useState<Ownership>('lease');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -78,11 +80,15 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
   const truck = opts.trucks[truckIdx];
   const driver = opts.drivers[driverIdx];
   const validName = name.trim().length >= 2;
-  const daily = truck.leasePerDay + driver.salaryPerDay;
+  const startCash = BALANCE.startCash + (opts ? hqProfile(hq).grant : 0);
+  const canBuy = startCash >= truck.buyPrice;
+  const buying = mode === 'own' && canBuy;
+  const rate = buying ? 0 : truck.leasePerDay;
+  const daily = rate + driver.salaryPerDay;
 
   const start = async () => {
     setBusy(true);
-    await sim.startGame({ seed: opts.seed, companyName: name.trim(), hqCityId: hq, truck, driver });
+    await sim.startGame({ seed: opts.seed, companyName: name.trim(), hqCityId: hq, truck, truckMode: buying ? 'own' : 'lease', driver });
     onDone();
   };
 
@@ -124,7 +130,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
           {step === 1 && (
             <>
               <p className="muted">
-                W siedzibie odbierasz auta z salonu i stąd częściej startują zlecenia, bo miejscowi klienci Cię znają. Kropki pokazują ruch w
+                W siedzibie odbierasz kupiony sprzęt i stąd częściej startują zlecenia, bo miejscowi klienci Cię znają. Kropki pokazują ruch w
                 regionie. Duże miasto to więcej ofert, ale też droższa baza, wyższe pensje i konkurencja. Na prowincji odwrotnie.
               </p>
               <div className="setup-grid cities" role="radiogroup" aria-label="Siedziba">
@@ -154,7 +160,10 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
 
           {step === 2 && (
             <>
-              <p className="muted">Pierwszy ciągnik bierzesz w leasing bez kaucji. Tańsza rata to zwykle większe zużycie i spalanie, a to koszt przy każdym kursie.</p>
+              <p className="muted">
+                Wybierz ciągnik i sposób finansowania. Leasing (na start bez kaucji) zostawia gotówkę w kasie, zakup oznacza zero rat, ale mniej
+                pieniędzy na pierwsze tygodnie. Bardziej zużyte auto pali więcej i częściej się psuje.
+              </p>
               <div className="setup-grid" role="radiogroup" aria-label="Pierwszy ciągnik">
                 {opts.trucks.map((t, i) => (
                   <Option key={t.id} on={truckIdx === i} onPick={() => setTruckIdx(i)}>
@@ -173,9 +182,23 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
                       </span>
                       <span style={{ color: wearColor(t.wear) }}>{pct(t.wear)}</span>
                     </span>
-                    <span className="opt-price num">{pln(t.leasePerDay)}/dzień</span>
+                    <span className="opt-price num">
+                      {pln(t.leasePerDay)}/dzień <span className="muted">albo {pln(t.buyPrice)}</span>
+                    </span>
                   </Option>
                 ))}
+              </div>
+              <div className="buy-lease setup-mode" role="radiogroup" aria-label="Finansowanie">
+                <button role="radio" aria-checked={!buying} className={`deal deal-lease${!buying ? ' on' : ''}`} onClick={() => setMode('lease')}>
+                  <span className="deal-kind">Leasing</span>
+                  <strong className="num">{pln(truck.leasePerDay)}/dzień</strong>
+                  <span className="deal-sub num">w kasie zostaje {pln(startCash)}</span>
+                </button>
+                <button role="radio" aria-checked={buying} disabled={!canBuy} className={`deal deal-buy${buying ? ' on' : ''}`} onClick={() => setMode('own')}>
+                  <span className="deal-kind">Kupno</span>
+                  <strong className="num">{pln(truck.buyPrice)}</strong>
+                  <span className="deal-sub num">{canBuy ? `w kasie zostaje ${pln(startCash - truck.buyPrice)}` : `brakuje ${pln(truck.buyPrice - startCash)}`}</span>
+                </button>
               </div>
             </>
           )}
@@ -203,7 +226,17 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
               <p className="setup-summary">
                 <strong>{name.trim()}</strong>, siedziba: {CITIES.find((c) => c.id === hq)?.name}. Start z <strong className="num">{pln(BALANCE.startCash + hqProfile(hq).grant)}</strong>
                 {hqProfile(hq).grant > 0 ? ' (z dotacją)' : ''},
-                koszty stałe <strong className="num">{pln(daily)}</strong> na dobę (rata {pln(truck.leasePerDay)} + pensja {pln(driver.salaryPerDay)}).
+                {buying ? (
+                  <>
+                    po zakupie auta zostaje <strong className="num">{pln(startCash - truck.buyPrice)}</strong>. Koszty stałe{' '}
+                    <strong className="num">{pln(daily)}</strong> na dobę (sama pensja).
+                  </>
+                ) : (
+                  <>
+                    koszty stałe <strong className="num">{pln(daily)}</strong> na dobę (rata {pln(rate)} + pensja {pln(driver.salaryPerDay)}).
+                  </>
+                )}{' '}
+                Plandekę dostajesz po wujku, za darmo.
                 {driverScore(driver) >= 70 && ' Rutyniarz kosztuje, ale szybko się zwraca.'}
               </p>
             </>

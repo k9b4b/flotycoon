@@ -171,7 +171,8 @@ describe('giełda', () => {
     const truck = s.trucks[0];
     const job = s.market.find((j) => previewJob(s, j, truck).onTime)!;
     expect(acceptJob(s, job.id, truck.id).ok).toBe(true);
-    advanceTo(s, s.trips[truck.tripId!].eta + 1);
+    // ETA może się przesunąć przez zdarzenia na trasie, więc czekamy do faktycznego rozładunku.
+    while (truck.tripId) advanceTo(s, s.trips[truck.tripId].eta + 1);
     const local = s.market.filter((j) => j.fromId === job.toId && j.expiresAt > s.now);
     expect(local.length).toBeGreaterThanOrEqual(BALANCE.backloadOffers);
     // Wypoczęty kierowca zdąży z każdym z nich (dojazd 0 km, okno załadunku i zapas w terminie).
@@ -203,7 +204,7 @@ describe('progresja i rynek', () => {
     const E = await import('../src/engine/sim');
     const s = newGame(36);
     s.cash = 1_000_000;
-    expect(E.leaseOffer(s, s.truckOffers[0].id).ok).toBe(true);
+    expect(E.acquireTruck(s, s.truckOffers[0].id, 'lease').ok).toBe(true);
     const [t1, t2] = s.trucks;
     expect(t2.driverId).toBeNull(); // leasing nie przydziela kierowcy
     const d1 = s.drivers[0];
@@ -230,12 +231,12 @@ describe('progresja i rynek', () => {
     const E = await import('../src/engine/sim');
     const s = newGame(32);
     s.cash = 1_000_000;
-    while (s.trucks.length < E.fleetCap(s)) expect(E.leaseOffer(s, s.truckOffers[0].id).ok).toBe(true);
-    expect(E.leaseOffer(s, s.truckOffers[0].id).ok).toBe(false);
+    while (s.trucks.length < E.fleetCap(s)) expect(E.acquireTruck(s, s.truckOffers[0].id, 'lease').ok).toBe(true);
+    expect(E.acquireTruck(s, s.truckOffers[0].id, 'lease').ok).toBe(false);
     expect(E.upgradeYard(s).ok).toBe(false); // ranga 0
     s.reputation = 30;
     expect(E.upgradeYard(s).ok).toBe(true);
-    expect(E.leaseOffer(s, s.truckOffers[0].id).ok).toBe(true);
+    expect(E.acquireTruck(s, s.truckOffers[0].id, 'lease').ok).toBe(true);
   });
 
   it('dyspozytorka sama wysyła wolne zestawy w trasę', async () => {
@@ -524,8 +525,75 @@ describe('kreator firmy', () => {
     expect(s.drivers[0].nickname).toBe(o.drivers[0].nickname);
     expect(s.trucks[0].driverId).toBe(s.drivers[0].id);
     s.cash = 1e6;
-    expect(E.leaseOffer(s, s.truckOffers[0].id).ok).toBe(true);
+    expect(E.acquireTruck(s, s.truckOffers[0].id, 'lease').ok).toBe(true);
     expect(s.trucks[1].cityId).toBe('POZ'); // auta z salonu odbiera się w siedzibie
+  });
+});
+
+describe('rynek ciągników i naczep', () => {
+  it('kupno: płacisz z góry, rata 0, sprzedaż daje mniej niż zakup; leasing: kaucja i rata, zwrot z karą', async () => {
+    const E = await import('../src/engine/sim');
+    const s = newGame(70);
+    s.cash = 1e6;
+    s.reputation = 30;
+    E.upgradeYard(s);
+    const o = s.truckOffers[0];
+    const cash0 = s.cash;
+    expect(E.acquireTruck(s, o.id, 'own').ok).toBe(true);
+    const bought = s.trucks.at(-1)!;
+    expect(bought.ownership).toBe('own');
+    expect(bought.leasePerDay).toBe(0);
+    expect(cash0 - s.cash).toBe(o.buyPrice);
+    const o2 = s.truckOffers[0];
+    expect(E.acquireTruck(s, o2.id, 'lease').ok).toBe(true);
+    const leased = s.trucks.at(-1)!;
+    expect(leased.leasePerDay).toBeGreaterThan(0);
+    // sprzedaż własnego: mniej niż zakup, ale nie zero
+    const c1 = s.cash;
+    expect(E.disposeTruck(s, bought.id).ok).toBe(true);
+    expect(s.cash - c1).toBeGreaterThan(0);
+    expect(s.cash - c1).toBeLessThan(o.buyPrice);
+    // zwrot leasingu: kara
+    const c2 = s.cash;
+    expect(E.disposeTruck(s, leased.id).ok).toBe(true);
+    expect(s.cash).toBeLessThan(c2);
+  });
+
+  it('naczepy: osobny sprzęt, przepinanie między ciągnikami (zamiana), opłata poza siedzibą', async () => {
+    const E = await import('../src/engine/sim');
+    const s = newGame(71);
+    s.cash = 1e6;
+    const [t1] = s.trucks;
+    const starter = s.trailers[0];
+    expect(t1.trailerId).toBe(starter.id);
+    expect(E.acquireTruck(s, s.truckOffers[0].id, 'lease').ok).toBe(true);
+    const t2 = s.trucks.at(-1)!;
+    expect(t2.trailerId ?? null).toBeNull();
+    const curtainOffer = s.trailerOffers.find((x) => x.type === 'curtain')!;
+    expect(E.acquireTrailer(s, curtainOffer.id, 'lease').ok).toBe(true);
+    const tr2 = s.trailers.at(-1)!;
+    expect(E.attachTrailer(s, t2.id, tr2.id).ok).toBe(true);
+    // zamiana: t1 bierze naczepę t2, t2 dostaje starter
+    expect(E.attachTrailer(s, t1.id, tr2.id).ok).toBe(true);
+    expect(t1.trailerId).toBe(tr2.id);
+    expect(t2.trailerId).toBe(starter.id);
+    // poza siedzibą kosztuje podstawienie
+    t1.cityId = t1.cityId === 'GDN' ? 'KRK' : 'GDN';
+    const c = s.cash;
+    expect(E.attachTrailer(s, t1.id, starter.id).ok).toBe(true);
+    expect(c - s.cash).toBe(E.TRAILER_DELIVERY_FEE);
+  });
+
+  it('wycena: nowy jest wart cenę katalogową, przebieg i zużycie obniżają wartość', async () => {
+    const A = await import('../src/engine/assets');
+    const base = { brand: 'Skania', model: 'R 450' };
+    const fresh = A.truckValue({ ...base, odometerKm: 1000, wear: 0 });
+    const mid = A.truckValue({ ...base, odometerKm: 400_000, wear: 0.3 });
+    const old = A.truckValue({ ...base, odometerKm: 900_000, wear: 0.7 });
+    expect(fresh).toBe(178_000);
+    expect(mid).toBeLessThan(fresh);
+    expect(old).toBeLessThan(mid);
+    expect(old).toBeGreaterThan(0);
   });
 });
 
@@ -540,21 +608,34 @@ describe('naczepy i ładunki specjalne', () => {
     s.market.push(job);
     expect(E.previewJob(s, job, t).blocked).toContain('chłodnia');
     expect(E.acceptJob(s, 'jx', t.id).ok).toBe(false);
-    expect(E.setTrailer(s, t.id, 'reefer').ok).toBe(false); // ranga 0
+    const buyType = (type: 'reefer' | 'adr' | 'lowbed') => {
+      s.trailerOffers.push({ ...E.trailerOffer(s, type, 'used') });
+      return E.acquireTrailer(s, s.trailerOffers[s.trailerOffers.length - 1].id, 'own');
+    };
+    expect(buyType('reefer').ok).toBe(false); // ranga 0
     s.reputation = 30;
-    expect(E.setTrailer(s, t.id, 'reefer').ok).toBe(true);
+    expect(buyType('reefer').ok).toBe(true);
+    const reefer = s.trailers.at(-1)!;
+    expect(E.attachTrailer(s, t.id, reefer.id).ok).toBe(true);
+    expect(t.trailer).toBe('reefer');
     expect(E.previewJob(s, job, t).blocked).toBeNull();
     const adr = { ...job, id: 'ja', trailer: 'adr' as const };
     s.reputation = 150;
-    E.setTrailer(s, t.id, 'adr');
+    buyType('adr');
+    E.attachTrailer(s, t.id, s.trailers.at(-1)!.id);
     expect(E.previewJob(s, adr, t).blocked).toBe('kierowca bez ADR');
     d.certs = ['adr'];
     expect(E.previewJob(s, adr, t).blocked).toBeNull();
     const low = { ...job, id: 'jl', trailer: 'lowbed' as const };
     s.reputation = 450;
-    E.setTrailer(s, t.id, 'lowbed');
+    buyType('lowbed');
+    E.attachTrailer(s, t.id, s.trailers.at(-1)!.id);
     d.stats.experience = 40;
     expect(E.previewJob(s, low, t).blocked).toContain('gabaryt');
+    // bez naczepy nic nie pojedzie
+    E.attachTrailer(s, t.id, null);
+    expect(E.previewJob(s, s.market[0], t).blocked).toBe('brak naczepy');
+    expect(E.isAvailable(t)).toBe(false);
   });
 
   it('kurs ADR daje uprawnienia i zdaje się raz', async () => {

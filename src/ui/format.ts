@@ -13,7 +13,7 @@ export const COST_LABELS: Record<string, string> = {
   lease: 'Leasing',
   repairs: 'Serwis i naprawy',
   fines: 'Mandaty',
-  fleet: 'Rekrutacja, kaucje, inwestycje',
+  fleet: 'Zakupy, kaucje, rekrutacja, inwestycje',
   bonuses: 'Premie',
   base: 'Baza, biuro, dyspozytor',
   training: 'Szkolenia',

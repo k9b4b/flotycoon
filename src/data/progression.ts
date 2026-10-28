@@ -12,9 +12,9 @@ export interface Rank {
 
 export const RANKS: readonly Rank[] = [
   { name: 'Jeden gość z Iveco', minRep: 0, perk: 'Start. Plac u szwagra na 3 auta.' },
-  { name: 'Firma krzak', minRep: 30, perk: 'Można powiększyć plac. Lepsi kandydaci na kierowców.' },
-  { name: 'Lokalny przewoźnik', minRep: 150, perk: 'Warsztat, biuro spedycji, nowe auta w salonie.' },
-  { name: 'Przewoźnik krajowy', minRep: 450, perk: 'Dyspozytor. Szersza oferta salonu.' },
+  { name: 'Firma krzak', minRep: 30, perk: 'Można powiększyć plac. Lepsi kandydaci. Chłodnie na rynku.' },
+  { name: 'Lokalny przewoźnik', minRep: 150, perk: 'Warsztat, biuro spedycji, cysterny ADR.' },
+  { name: 'Przewoźnik krajowy', minRep: 450, perk: 'Dyspozytor, niskopodwozia na gabaryty, więcej ofert na rynku.' },
   { name: 'Spedycja z ambicjami', minRep: 1100, perk: 'Centrum logistyczne na 25 aut.' },
   { name: 'Gracz z prawdziwego zdarzenia', minRep: 2500, perk: 'Terminal na 50 aut. Najlepsi kierowcy na rynku.' },
   { name: 'Potentat ze Strykowa', minRep: 5000, perk: 'Szacunek na każdym MOP-ie.' },
@@ -89,14 +89,12 @@ export const UPGRADES: readonly Upgrade[] = [
 export const WORKSHOP = { costMul: 0.6, timeMul: 0.5 } as const;
 export const OFFICE = { extraOffers: 6, extraBackload: 2 } as const;
 
-/** Rynek pracy i salon: liczba ofert i ich jakość rośnie z rangą. */
+/** Rynek pracy i rynek sprzętu: liczba ofert i ich jakość rośnie z rangą. */
 export const MARKETS = {
   candidatesBase: 4,
   candidatesRefreshMin: 2 * 24 * 60,
   truckOffersBase: 5,
   truckOffersRefreshMin: 3 * 24 * 60,
-  /** Od której rangi w salonie pojawiają się nowe auta. */
-  newTrucksRank: 2,
   dispatchEveryMin: 30,
   /** Odprawa przy zwolnieniu: tyle dniówek. */
   severanceDays: 5,

@@ -1,5 +1,8 @@
 import { YARD } from '../data/progression';
 import { rollPerks } from './company';
+import { newTruckOffer, trailerOffer, usedTruckOffer } from './assets';
+import { TRUCK_MODELS } from '../data/flavor';
+import { TRAILERS } from '../data/trailers';
 import { qPush } from './queue';
 import { SAVE_VERSION, type GameState } from './types';
 
@@ -25,7 +28,7 @@ const MIGRATIONS: Record<number, (s: any) => any> = {
       truckOffers: [],
       costsByCategory: { bonuses: 0, base: 0, training: 0, ...s.costsByCategory },
     };
-    // Rynek pracy i salon zapełnią się przy pierwszym zdarzeniu.
+    // Rynek pracy i rynek sprzętu zapełnią się przy pierwszym zdarzeniu.
     qPush(out.queue, s.now, { type: 'CANDIDATES_REFRESH' });
     qPush(out.queue, s.now, { type: 'OFFERS_REFRESH' });
     return out;
@@ -44,6 +47,37 @@ const MIGRATIONS: Record<number, (s: any) => any> = {
       settings: { askDecisions: true },
       decisions: [],
     };
+  },
+  // 4 → 5: rynek ciągników i naczep (kupno albo leasing), naczepy jako osobny sprzęt.
+  4: (s) => {
+    // Dawne raty naczep specjalnych zostają takie, jakie gracz znał; plandeka była „w pakiecie”, więc dostaje ją na własność.
+    const oldLease: Record<string, number> = { reefer: 90, adr: 130, lowbed: 115 };
+    const trailers: any[] = [];
+    const trucks = s.trucks.map((t: any, i: number) => {
+      const type = t.trailer ?? 'curtain';
+      const special = type !== 'curtain';
+      const id = `n${s.nextId++}`;
+      trailers.push({
+        id,
+        label: `N-${String(i + 1).padStart(2, '0')}`,
+        type,
+        condition: 'used',
+        ownership: special ? 'lease' : 'own',
+        leasePerDay: special ? oldLease[type] : 0,
+        deposit: 0,
+        newPrice: TRAILERS[type as keyof typeof TRAILERS].newPrice,
+        wear: 0.3,
+        km: 0,
+        truckId: t.id,
+      });
+      const model = TRUCK_MODELS.find((m) => m.brand === t.brand && m.model === t.model);
+      return { ...t, ownership: 'lease', newPrice: model?.newPrice ?? 170_000, trailerId: id, trailer: type };
+    });
+    const out = { ...s, version: 5, trucks, trailers, truckOffers: [], trailerOffers: [] };
+    // Nowe oferty od razu (kolejka odświeżania rynku już istnieje, więc bez dokładania drugiej).
+    out.truckOffers = [newTruckOffer(out), usedTruckOffer(out), usedTruckOffer(out), usedTruckOffer(out), newTruckOffer(out)];
+    out.trailerOffers = [trailerOffer(out, 'curtain', 'used'), trailerOffer(out, 'curtain', 'new'), trailerOffer(out), trailerOffer(out)];
+    return out;
   },
   // 3 → 4: kontrakty ze stałymi klientami i szkolenia kierowców.
   3: (s) => {

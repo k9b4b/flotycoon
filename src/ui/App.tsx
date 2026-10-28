@@ -211,10 +211,12 @@ export function App() {
             hire: (id) => run(sim.hireDriver(id)),
             fire: (id) => run(sim.fireDriver(id)),
             assign: (truckId, driverId) => run(sim.assignDriver(truckId, driverId)),
-            lease: (id) => run(sim.leaseOffer(id)),
-            returnTruck: (id) => run(sim.returnTruck(id)),
+            acquireTruck: (id, mode) => run(sim.acquireTruck(id, mode)),
+            acquireTrailer: (id, mode) => run(sim.acquireTrailer(id, mode)),
+            disposeTruck: (id) => run(sim.disposeTruck(id)),
+            disposeTrailer: (id) => run(sim.disposeTrailer(id)),
+            attachTrailer: (truckId, trailerId) => run(sim.attachTrailer(truckId, trailerId)),
             train: (driverId, courseId) => run(sim.trainDriver(driverId, courseId)),
-            trailer: (truckId, type) => run(sim.setTrailer(truckId, type)),
           }}
         />
         <CompanyPanel

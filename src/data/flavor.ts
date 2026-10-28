@@ -1,16 +1,17 @@
 /** Treści „z humorkiem”. Czyste dane: dopisuj śmiało, logika ich nie zna. */
 
 export const TRUCK_MODELS = [
-  { brand: 'Skania', model: 'R 450', fuelL100: 30.5 },
-  { brand: 'Skania', model: 'S 500', fuelL100: 31.5 },
-  { brand: 'Wolwo', model: 'FH 460', fuelL100: 30.0 },
-  { brand: 'MEN', model: 'TGX 18.470', fuelL100: 31.0 },
-  { brand: 'DAFF', model: 'XF 480', fuelL100: 29.5 },
-  { brand: 'Merceles', model: 'Actros 1845', fuelL100: 29.0 },
-  { brand: 'Iweko', model: 'S-Way 490', fuelL100: 32.0 },
-  { brand: 'Renolt', model: 'Premium 450 DXi', fuelL100: 30.5 },
+  // newPrice: cena nowego u dealera (zł). Wartość używanego liczy się od niej (przebieg, zużycie).
+  { brand: 'Skania', model: 'R 450', fuelL100: 30.5, newPrice: 178_000 },
+  { brand: 'Skania', model: 'S 500', fuelL100: 31.5, newPrice: 192_000 },
+  { brand: 'Wolwo', model: 'FH 460', fuelL100: 30.0, newPrice: 182_000 },
+  { brand: 'MEN', model: 'TGX 18.470', fuelL100: 31.0, newPrice: 168_000 },
+  { brand: 'DAFF', model: 'XF 480', fuelL100: 29.5, newPrice: 172_000 },
+  { brand: 'Merceles', model: 'Actros 1845', fuelL100: 29.0, newPrice: 186_000 },
+  { brand: 'Iweko', model: 'S-Way 490', fuelL100: 32.0, newPrice: 158_000 },
+  { brand: 'Renolt', model: 'Premium 450 DXi', fuelL100: 30.5, newPrice: 160_000 },
   // Legenda z płaską podłogą. Nie produkują jej od lat, więc trafia się tylko używana.
-  { brand: 'Renolt', model: 'Magnum 480', fuelL100: 32.5, usedOnly: true },
+  { brand: 'Renolt', model: 'Magnum 480', fuelL100: 32.5, newPrice: 165_000, usedOnly: true },
 ] as const;
 
 export const MALE_NAMES = ['Zbigniew', 'Mirosław', 'Krzysztof', 'Janusz', 'Mariusz', 'Dariusz', 'Tadeusz', 'Sławomir', 'Henryk', 'Ryszard', 'Waldemar', 'Grzegorz'];

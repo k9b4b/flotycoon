@@ -2,25 +2,23 @@ import { BALANCE } from '../data/balance';
 import { CITIES, CITY_BY_ID, HOME_BASE } from '../data/cities';
 import { hqProfile } from '../data/hq';
 import { ARRIVE_FLAVOR, CB_DEPART, CLIENTS, COMPANY_START, DAILY_FLAVOR, LATE_EXCUSES, NICKNAMES } from '../data/flavor';
-import { MARKETS, OFFICE, RANKS, REPUTATION } from '../data/progression';
+import { MARKETS, OFFICE, REPUTATION } from '../data/progression';
 import {
   addReputation,
   driverOfTruck,
   generateDriver,
   rankIndex,
   refreshCandidates,
-  refreshTruckOffers,
   serviceModifiers,
-  truckFromOffer,
   truckOfDriver,
   upgradesPerDay,
-  usedOffer,
 } from './company';
 import { driverName, earn, fmtPLN, g, log, newId, spend, type ActionResult } from './core';
 import { FRESH_DUTY, planTrip, type Leg } from './drivingRules';
-import { clamp, perkMods, rigSpeedKmh, rollIncidents, trailerOf, tripCosts } from './effects';
-import { TRAILERS, type TrailerType } from '../data/trailers';
+import { clamp, perkMods, rigSpeedKmh, rollIncidents, tripCosts } from './effects';
+import { TRAILERS } from '../data/trailers';
 import { pickCargo } from './cargo';
+import { refreshVehicleOffers, starterTrailer, trailerOfTruck, truckFromOffer, usedTruckOffer } from './assets';
 import { createQueue, qPeek, qPop, qPush } from './queue';
 import { chance, createRng, pick, pickWeighted, rand, randInt, randRange } from './rng';
 import { onContractCheck, onContractOffers, onContractPost, onContractRunDone, refreshContractOffers } from './contracts';
@@ -29,11 +27,12 @@ import { checkMilestones, onTrainingDone } from './training';
 import { ALL_ROAD_EVENTS, ROAD_EVENT_BY_ID, eventCtx, optionLabel, type Outcome } from './roadEvents';
 import { roadKm } from './routes';
 import { MIN_PER_HOUR, dayIndex, formatDuration, formatGameTime, nextMidnight } from './time';
-import { SAVE_VERSION, type Driver, type GameEvent, type GameState, type IncidentInfo, type Job, type PendingDecision, type Phase, type Trip, type Truck, type TruckOffer, type TutorialState } from './types';
+import { SAVE_VERSION, type Driver, type GameEvent, type GameState, type IncidentInfo, type Job, type Ownership, type PendingDecision, type Phase, type Trip, type Truck, type TruckOffer, type TutorialState } from './types';
 
 // Ponowny eksport, żeby UI, worker i narzędzia miały jedno miejsce importu.
 export { driverName, fmtPLN, g, log, type ActionResult };
 export * from './company';
+export * from './assets';
 export { activeContracts, maxContracts, signContract } from './contracts';
 export { courseGain, timesTaken, trainDriver } from './training';
 export { ALL_ROAD_EVENTS as ROAD_EVENTS, ROAD_EVENT_BY_ID, eventCtx } from './roadEvents';
@@ -43,7 +42,7 @@ export { ALL_ROAD_EVENTS as ROAD_EVENTS, ROAD_EVENT_BY_ID, eventCtx } from './ro
 /** Auto stoi na placu: nie jest w trasie ani w serwisie. */
 export const isIdle = (t: Truck) => !t.tripId && t.serviceUntil === null;
 /** Auto może wziąć zlecenie: stoi i ma kierowcę. */
-export const isAvailable = (t: Truck) => isIdle(t) && t.driverId !== null;
+export const isAvailable = (t: Truck) => isIdle(t) && t.driverId !== null && !!t.trailerId;
 
 // ─── Giełda ──────────────────────────────────────────────────────────────────
 
@@ -110,24 +109,6 @@ export function generateJob(s: GameState, forcedFrom?: string, special?: boolean
   };
 }
 
-/** Podpina inną naczepę do stojącego zestawu. */
-export function setTrailer(s: GameState, truckId: string, type: TrailerType): ActionResult {
-  const t = s.trucks.find((x) => x.id === truckId);
-  const spec = TRAILERS[type];
-  if (!t || !spec) return { ok: false, error: 'Nie ma takiego auta albo naczepy.' };
-  if (t.tripId) return { ok: false, error: 'Zestaw jest w trasie. Naczepę zmienisz po rozładunku.' };
-  if ((t.trailer ?? 'curtain') === type) return { ok: false, error: `${spec.name} już jest podpięta.` };
-  if (rankIndex(s.reputation) < spec.rank) return { ok: false, error: `${spec.name}: dealer rozmawia dopiero z rangą „${RANKS[spec.rank].name}”.` };
-  if (s.cash < spec.swapFee) return { ok: false, error: `Podpięcie kosztuje ${fmtPLN(spec.swapFee)}.` };
-  if (spec.swapFee) spend(s, spec.swapFee, 'fleet');
-  t.trailer = type;
-  const msg =
-    type === 'curtain'
-      ? `${t.brand} ${t.model} (${t.plate}) wraca do zwykłej plandeki. Rata za naczepę specjalną już nie leci.`
-      : `Do ${t.brand} ${t.model} (${t.plate}) podpięto: ${spec.name.toLowerCase()}. Rata naczepy ${fmtPLN(spec.leasePerDay)}/dzień.`;
-  log(s, 'info', msg);
-  return { ok: true, message: msg };
-}
 
 const marketSize = (s: GameState) => BALANCE.marketSize + (s.base.office ? OFFICE.extraOffers : 0) + hqProfile(s.hqCityId).market;
 
@@ -151,6 +132,8 @@ export interface GameSetup {
   companyName: string;
   hqCityId: string;
   truck: TruckOffer;
+  /** Pierwszy ciągnik: leasing (domyślnie) albo zakup za gotówkę. */
+  truckMode?: Ownership;
   driver: Driver;
 }
 
@@ -185,7 +168,7 @@ export function setupOptions(seed: number, hqCityId?: string): SetupOptions {
   const s = blankState(seed ^ 0x5eed);
   s.hqCityId = hqCityId; // pensje kandydatów zależą od lokalnego rynku pracy
   const trucks = Array.from({ length: 8 }, () => {
-    const o = usedOffer(s);
+    const o = usedTruckOffer(s);
     o.wear = Math.min(o.wear, 0.35);
     return o;
   }).sort((a, b) => a.leasePerDay - b.leasePerDay);
@@ -235,6 +218,8 @@ function blankState(seed: number): GameState {
     decisions: [],
     contracts: [],
     contractOffers: [],
+    trailers: [],
+    trailerOffers: [],
   };
 }
 
@@ -254,15 +239,23 @@ export function newGame(seed: number, setup?: GameSetup): GameState {
     boostStarter(d);
   }
   s.drivers.push(d);
-  const offer = setup ? setup.truck : usedOffer(s);
-  const first = truckFromOffer({ ...offer, id: newId(s, 't') }, hq, d.id);
+  const offer = setup ? setup.truck : usedTruckOffer(s);
+  const mode: Ownership = setup?.truckMode === 'own' && s.cash >= offer.buyPrice ? 'own' : 'lease';
+  if (mode === 'own') s.cash -= offer.buyPrice; // pierwszy zakup idzie z kapitału, bez wpisu w koszty dnia
+  const first = truckFromOffer(offer, newId(s, 't'), hq, d.id, mode);
   if (!setup) first.wear = Math.min(first.wear, 0.3);
   s.trucks.push(first);
+  // Naczepa na start: używana plandeka po wujku, od razu podpięta.
+  const tr = starterTrailer(s);
+  tr.truckId = first.id;
+  s.trailers.push(tr);
+  first.trailerId = tr.id;
+  first.trailer = tr.type;
   refillMarket(s);
   refreshCandidates(s);
-  refreshTruckOffers(s);
+  refreshVehicleOffers(s);
   for (const line of COMPANY_START) log(s, 'funny', line.replace('{company}', s.companyName).replace('{cash}', fmtPLN(s.cash)));
-  log(s, 'info', `Siedziba: ${CITY_BY_ID[hq].name}. Pierwszy ciągnik: ${first.brand} ${first.model} (${first.plate}).`);
+  log(s, 'info', `Siedziba: ${CITY_BY_ID[hq].name}. Pierwszy ciągnik: ${first.brand} ${first.model} (${first.plate}), ${mode === 'own' ? 'kupiony' : 'w leasingu'}. Do tego plandeka ${tr.label} po wujku.`);
   if (grant > 0) log(s, 'good', `Urząd marszałkowski przyznał dotację na rozwój regionu: ${fmtPLN(grant)}. Pani z urzędu prosi o zdjęcie ciężarówki do folderu.`);
   log(s, 'info', `Zatrudniono: ${driverName(d)}. ${d.quirk}`);
   qPush(s.queue, nextMidnight(s.now), { type: 'DAILY' });
@@ -327,6 +320,7 @@ export function previewJob(s: GameState, job: Job, truck: Truck): JobPreview {
 
 /** Czy zestaw może wziąć ładunek: naczepa i uprawnienia kierowcy. Zwraca powód odmowy albo null. */
 export function jobFit(truck: Truck, driver: Driver, job: Job): string | null {
+  if (!truck.trailerId) return 'brak naczepy';
   const need = TRAILERS[job.trailer ?? 'curtain'];
   if ((truck.trailer ?? 'curtain') !== need.id) return `wymaga naczepy: ${need.short}`;
   if (need.cert && !(driver.certs ?? []).includes(need.cert)) return 'kierowca bez ADR';
@@ -348,7 +342,7 @@ export function acceptJob(s: GameState, jobId: string, truckId: string): ActionR
 
   const misfit = jobFit(truck, driver, job);
   if (misfit) return { ok: false, error: `Ten zestaw się nie nada: ${misfit}.` };
-  const incidents = rollIncidents(s.rng, truck, driver, emptyKm + job.km);
+  const incidents = rollIncidents(s.rng, truck, driver, emptyKm + job.km, trailerOfTruck(s, truck)?.wear ?? 0);
   const { phases, duty } = planTrip(s.now, legsFor(job, emptyKm), rigSpeedKmh(truck, driver), incidents, driver.duty);
   const costs = tripCosts(truck, driver, job, emptyKm);
   const trip: Trip = {
@@ -510,7 +504,9 @@ const fillDriver = (text: string, d: Driver) => text.replaceAll('{nick}', d.nick
 export function serviceQuote(s: GameState, t: Truck) {
   const mod = serviceModifiers(s);
   const floor = agingFloor(t);
-  const cost = Math.round(((1500 + Math.max(0, t.wear - floor) * 12_000) * mod.costMul) / 10) * 10;
+  // Serwis obejmuje też podpiętą naczepę.
+  const trailerWear = t.trailerId ? (s.trailers.find((x) => x.id === t.trailerId)?.wear ?? 0) : 0;
+  const cost = Math.round(((1500 + Math.max(0, t.wear - floor) * 12_000 + Math.max(0, trailerWear - 0.05) * 4_000) * mod.costMul) / 10) * 10;
   return { cost, durationMin: Math.round(BALANCE.serviceMin * mod.timeMul), wearAfter: floor };
 }
 
@@ -639,6 +635,11 @@ function onTripDone(s: GameState, tripId: string): boolean {
   truck.cityId = job.toId;
   truck.odometerKm += totalKm;
   truck.wear = clamp(truck.wear + totalKm * BALANCE.wearPerKm * (driver ? perkMods(driver).wearMul : 1), 0, 1);
+  const trailer = trailerOfTruck(s, truck);
+  if (trailer) {
+    trailer.km += totalKm;
+    trailer.wear = clamp(trailer.wear + totalKm * BALANCE.wearPerKm * 0.5, 0, 1);
+  }
   truck.tripId = null;
 
   const kmBefore = driver?.kmDriven ?? 0;
@@ -683,7 +684,7 @@ function onTripDone(s: GameState, tripId: string): boolean {
 
 function onDaily(s: GameState) {
   const salaries = s.drivers.reduce((sum, d) => sum + d.salaryPerDay, 0);
-  const leases = s.trucks.reduce((sum, t) => sum + t.leasePerDay + trailerOf(t).leasePerDay, 0);
+  const leases = s.trucks.reduce((sum, t) => sum + t.leasePerDay, 0) + s.trailers.reduce((sum, t) => sum + t.leasePerDay, 0);
   spend(s, salaries, 'salaries');
   spend(s, leases, 'lease');
   const base = upgradesPerDay(s);
@@ -729,6 +730,8 @@ function handle(s: GameState, ev: GameEvent, interactive: boolean) {
       if (!t) return;
       t.serviceUntil = null;
       t.wear = agingFloor(t);
+      const tr = trailerOfTruck(s, t);
+      if (tr) tr.wear = Math.min(tr.wear, 0.05);
       log(s, 'good', `${t.plate} wraca z serwisu. Mechanik: „Teraz pojedzie jak nowa. No, prawie”.`);
       return;
     }
@@ -741,7 +744,7 @@ function handle(s: GameState, ev: GameEvent, interactive: boolean) {
     case 'CANDIDATES_REFRESH':
       return refreshCandidates(s);
     case 'OFFERS_REFRESH':
-      return refreshTruckOffers(s);
+      return refreshVehicleOffers(s);
     case 'DISPATCH':
       if (!s.base.dispatcher) return;
       if (s.base.autoDispatch) dispatch(s);

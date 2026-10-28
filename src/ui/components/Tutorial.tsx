@@ -162,21 +162,21 @@ const TIPS: Tip[] = [
     next: true,
     text: (
       <>
-        Stać Cię na drugie auto. Flota → <b>Salon</b>: używane mają niską ratę, nowe palą mniej i się nie psują. Pamiętaj, że do auta trzeba też
-        kierowcy.
+        Stać Cię na drugie auto. Flota → <b>Rynek</b>: każdy ciągnik kupisz albo weźmiesz w leasing. Do nowego auta potrzebny jest jeszcze kierowca i
+        naczepa (też na Rynku).
       </>
     ),
   },
   {
     id: 'nodriver',
     when: (s) => s.fleet.some((t) => t.status === 'nodriver'),
-    target: '.area-fleet .subtabs button:nth-child(3)',
+    target: '.area-fleet .subtabs button:nth-child(4)',
     tab: 'fleet',
     next: true,
     text: (
       <>
-        Auto bez kierowcy zarabia zero, a rata leci. Flota → <b>Rynek pracy</b>: zatrudnij kogoś, a potem na karcie auta wybierz go z listy. Kto
-        czym jeździ, decydujesz Ty.
+        Auto bez kierowcy zarabia zero, a koszty lecą. Flota → <b>Rynek → Kierowcy</b>: zatrudnij kogoś, a potem na karcie auta wybierz go z listy.
+        Kto czym jeździ, decydujesz Ty.
       </>
     ),
   },
@@ -230,8 +230,8 @@ const TIPS: Tip[] = [
     next: true,
     text: (
       <>
-        Na giełdzie wiszą też ładunki na <b>chłodnię</b>: płacą lepiej. Naczepę zmienisz w Szczegółach zestawu (opłata za podpięcie i rata
-        dzienna). Później dojdą cysterny ADR (kierowca potrzebuje kursu) i gabaryty na niskopodwoziu.
+        Na giełdzie wiszą też ładunki na <b>chłodnię</b>: płacą lepiej. Chłodnię kupisz albo weźmiesz w leasing na Rynku, a podepniesz w zakładce
+        Naczepy. Później dojdą cysterny ADR (kierowca potrzebuje kursu) i gabaryty na niskopodwoziu.
       </>
     ),
   },
@@ -380,11 +380,12 @@ export function HelpSheet({ onClose, onNewGame }: { onClose: () => void; onNewGa
     ['Jak zarabiać', 'Bierz zlecenia z giełdy, dowoź na czas, od razu szukaj ładunku powrotnego. Stojące auto kosztuje ratę i pensję. Zysk przy zleceniu jest już po paliwie i mycie.'],
     ['Zapas i terminy', '⏱ to czas do terminu, 🚚 czas kursu Twoim autem z dojazdem, przerwami i odpoczynkiem. Zielony zapas = bezpiecznie, „na styk” = korek wystarczy do spóźnienia. Do godziny po terminie klient zwykle wybacza.'],
     ['Kierowcy', 'Doświadczenie to prędkość, eco-driving spalanie, niezawodność mandaty, kondycja ryzyko zaspania, morale mnoży niezawodność. Cechy (perki) dają bonusy albo kłopoty. Kółko „i” przy statystykach wyjaśnia szczegóły. Kto czym jeździ, decydujesz sam.'],
-    ['Auta i serwis', 'Pasek przy tablicy to zużycie: więcej awarii i spalania. Serwis je obniża, ale nie poniżej poziomu z przebiegu. Nowe auta palą mniej, mają wyższą ratę.'],
+    ['Auta i serwis', 'Pasek przy tablicy to zużycie: więcej awarii i spalania. Serwis je obniża, ale nie poniżej poziomu z przebiegu. Nowe auta palą mniej i rzadko się psują.'],
+    ['Kupno czy leasing', 'Flota → Rynek. Kupno: płacisz raz, nie ma rat, a sprzęt sprzedasz później za ok. 90% wartości (wartość spada z przebiegiem i zużyciem). Leasing: mała kaucja i rata co dzień, zwrot przed czasem kosztuje 5 rat. Pod ofertą widać, po ilu dniach raty zakup by się zwrócił.'],
     ['Telefony z trasy', 'Gdy coś się dzieje, kierowca dzwoni i zegar czeka na decyzję. W tle albo po wyłączeniu w Firmie decyduje sam, zgodnie ze swoim charakterem.'],
-    ['Rozwój firmy', 'Terminowe kursy dają reputację, spóźnienia i mandaty ją zabierają. Ranga odblokowuje lepszych kandydatów, nowe auta, większy plac, warsztat, biuro i dyspozytorkę Halinę.'],
+    ['Rozwój firmy', 'Terminowe kursy dają reputację, spóźnienia i mandaty ją zabierają. Ranga odblokowuje lepszych kandydatów, naczepy specjalne, większy plac, warsztat, biuro i dyspozytorkę Halinę.'],
     ['Kontrakty', 'Od rangi „Firma krzak”: stała trasa co kilka dni za lepszą stawkę. Kurs pojawia się na giełdzie dobę wcześniej. Przepadnięty kurs kosztuje karę, trzy wpadki i umowa przepada, dokończona daje premię.'],
-    ['Naczepy', 'Plandeka jest w pakiecie. Chłodnia (od rangi 1), cysterna ADR (od rangi 2, kierowca musi mieć kurs ADR) i niskopodwozie na gabaryty (od rangi 3, doświadczenie min. 55) kosztują ratę dzienną i opłatę za podpięcie, ale ich ładunki płacą 25–50% lepiej. Naczepę zmienisz w Szczegółach zestawu, gdy stoi.'],
+    ['Naczepy', 'Naczepa to osobny sprzęt: bez niej ciągnik nie weźmie zlecenia. Plandeka wozi większość ładunków. Chłodnia (od rangi 1), cysterna ADR (od rangi 2, kierowca z kursem ADR) i niskopodwozie (od rangi 3, doświadczenie 55+) płacą 25–45% lepiej. Naczepy przepinasz między stojącymi ciągnikami w zakładce Naczepy; poza siedzibą podstawienie kosztuje 300 zł.'],
     ['Szkolenia', 'Flota → Kierowcy → Szkolenia. Kurs podnosi statystykę (coraz mniej przy powtórkach) i czasem leczy złą cechę. Na czas kursu auto zostaje bez kierowcy.'],
   ];
   return (

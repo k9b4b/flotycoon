@@ -6,13 +6,13 @@ import { formatGameTime } from '../../engine/time';
 import type { Driver } from '../../engine/types';
 import { MARKETS, RANKS } from '../../data/progression';
 import type { Snapshot } from '../../engine/view';
-import { km, pct, pln } from '../format';
-import { PerkList, ScoreBadge, StatBars, TraitChips, wearColor } from './driverUi';
+import { pln } from '../format';
+import { PerkList, ScoreBadge, StatBars, TraitChips } from './driverUi';
 import { TruckPicker } from './Pairing';
-import { DriverAvatar, TruckSprite } from '../avatar';
+import { DriverAvatar } from '../avatar';
 import type { FleetActions } from './FleetPanel';
 
-/** Kadry, rynek pracy i salon aut: trzy widoki panelu floty. */
+/** Kadry i kandydaci na kierowców (Flota → Kierowcy, Rynek → Kierowcy). */
 
 export function DriversList({ snap, a, onHire }: { snap: Snapshot; a: FleetActions; onHire: () => void }) {
   const drivers = [...snap.drivers].sort((x, y) => Number(!!x.truckId) - Number(!!y.truckId));
@@ -160,58 +160,6 @@ export function CandidatesList({ snap, a }: { snap: Snapshot; a: FleetActions })
           <div className="fc-actions">
             <button className="btn small primary" disabled={full || broke} onClick={() => a.hire(c.id)}>
               Zatrudnij · {pln(BALANCE.hireFee)}
-            </button>
-          </div>
-        </article>
-      ))}
-    </>
-  );
-}
-
-export function Showroom({ snap, a }: { snap: Snapshot; a: FleetActions }) {
-  const full = snap.fleet.length >= snap.company.fleetCap;
-  const hasNew = snap.company.rank >= MARKETS.newTrucksRank;
-  return (
-    <>
-      <p className="staff-note muted">
-        Leasing: kaucja na start, potem rata codziennie. Nowe auta palą mniej i się nie psują, ale rata jest dwa razy wyższa.
-        {!hasNew && ` Nowe auta od rangi „${RANKS[MARKETS.newTrucksRank].name}”.`} Oferty zmieniają się co 3 dni.
-        {full && <strong className="bad"> Plac pełny: rozbuduj go w zakładce Firma.</strong>}
-      </p>
-      {snap.truckOffers.length === 0 && <div className="empty">Handlarz pojechał po nowe auta do Niemiec.</div>}
-      {snap.truckOffers.map((o) => (
-        <article key={o.id} className="staff-card">
-          <div className="staff-head with-avatar">
-            <TruckSprite t={o} scale={3} />
-            <div className="fc-driver">
-              <strong>
-                {o.brand} {o.model}
-              </strong>
-            </div>
-            <span className={`badge ${o.condition === 'new' ? 'good' : 'warn'}`}>{o.condition === 'new' ? 'nowy' : 'używany'}</span>
-          </div>
-          <div className="staff-specs num">
-            <span>{km(o.odometerKm)}</span>
-            <span>Euro {o.euro}</span>
-            <span>{o.fuelL100} l/100</span>
-            <span className="wear-label" title="Zużycie: im wyższe, tym częstsze awarie i wyższe spalanie. Serwis je obniża, ale nie poniżej poziomu wynikającego z przebiegu.">
-              zużycie
-              <span className="fc-wear">
-                <span style={{ width: pct(o.wear), background: wearColor(o.wear) }} />
-              </span>
-              <span style={{ color: wearColor(o.wear) }}>{pct(o.wear)}</span>
-            </span>
-          </div>
-          <div className="staff-line">
-            <span>
-              <strong className="num">{pln(o.leasePerDay)}</strong>
-              <span className="muted">/dzień</span>
-            </span>
-            <span className="muted num">kaucja {pln(o.deposit)}</span>
-          </div>
-          <div className="fc-actions">
-            <button className="btn small primary" disabled={full || snap.cash < o.deposit} onClick={() => a.lease(o.id)}>
-              Bierzemy w leasing
             </button>
           </div>
         </article>

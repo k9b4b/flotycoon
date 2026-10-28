@@ -1,7 +1,6 @@
 import type { CatchUpReport, ActionResult, GameSetup, SetupOptions } from '../engine/sim';
 import type { Snapshot } from '../engine/view';
-import type { TutorialState } from '../engine/types';
-import type { TrailerType } from '../data/trailers';
+import type { Ownership, TutorialState } from '../engine/types';
 import type { UpgradeId } from '../data/progression';
 import type { CourseId } from '../data/development';
 
@@ -21,8 +20,11 @@ export interface SimApi {
   hireDriver(candidateId: string): ActionResult;
   fireDriver(driverId: string): ActionResult;
   assignDriver(truckId: string, driverId: string | null): ActionResult;
-  leaseOffer(offerId: string): ActionResult;
-  returnTruck(truckId: string): ActionResult;
+  acquireTruck(offerId: string, mode: Ownership): ActionResult;
+  acquireTrailer(offerId: string, mode: Ownership): ActionResult;
+  disposeTruck(truckId: string): ActionResult;
+  disposeTrailer(trailerId: string): ActionResult;
+  attachTrailer(truckId: string, trailerId: string | null): ActionResult;
   upgradeYard(): ActionResult;
   buyUpgrade(id: UpgradeId): ActionResult;
   setAutoDispatch(on: boolean): ActionResult;
@@ -30,7 +32,6 @@ export interface SimApi {
   setAskDecisions(on: boolean): ActionResult;
   signContract(offerId: string): ActionResult;
   setTutorial(t: TutorialState): ActionResult;
-  setTrailer(truckId: string, type: TrailerType): ActionResult;
   trainDriver(driverId: string, courseId: CourseId): ActionResult;
   newGame(seed?: number): void;
   save(): Promise<boolean>;

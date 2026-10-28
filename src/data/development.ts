@@ -40,9 +40,13 @@ export interface Course {
   fixes?: PerkId;
   /** Perk, który kurs może zamienić w lepszy. */
   converts?: [PerkId, PerkId];
+  /** Uprawnienia, które daje kurs (wtedy wystarczy go zdać raz). */
+  cert?: 'adr';
+  /** Od której rangi kurs jest dostępny. */
+  rank?: number;
 }
 
-export type CourseId = 'eco' | 'law' | 'odtj' | 'health';
+export type CourseId = 'eco' | 'law' | 'odtj' | 'health' | 'adr';
 
 export const COURSES: readonly Course[] = [
   {
@@ -84,6 +88,17 @@ export const COURSES: readonly Course[] = [
     days: 1,
     desc: 'Pani fizjoterapeutka i poduszka ortopedyczna gratis. Miłośnicy MOP-ów śpią potem krócej.',
     fixes: 'mop',
+  },
+  {
+    id: 'adr',
+    name: 'Kurs ADR (towary niebezpieczne)',
+    stat: 'reliability',
+    gain: 5,
+    cost: 3200,
+    days: 3,
+    desc: 'Trzy dni o klasach, tablicach i gaśnicach. Pomarańczowa tabliczka do portfela i wstęp do cystern.',
+    cert: 'adr',
+    rank: 2,
   },
 ];
 

@@ -214,6 +214,7 @@ export function App() {
             lease: (id) => run(sim.leaseOffer(id)),
             returnTruck: (id) => run(sim.returnTruck(id)),
             train: (driverId, courseId) => run(sim.trainDriver(driverId, courseId)),
+            trailer: (truckId, type) => run(sim.setTrailer(truckId, type)),
           }}
         />
         <CompanyPanel

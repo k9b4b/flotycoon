@@ -1,6 +1,7 @@
 import { BALANCE } from '../data/balance';
 import { CITY_BY_ID } from '../data/cities';
 import { kmAt, phaseAt } from './drivingRules';
+import { trailerOf } from './effects';
 import { ROAD_EVENT_BY_ID, eventCtx, optionHint, optionLabel } from './roadEvents';
 import { RANKS, UPGRADES, YARD, type Upgrade } from '../data/progression';
 import { buildCost, driverCap, driverOfTruck, fleetCap, isAvailable, previewJob, rankIndex, serviceQuote, truckOfDriver, upgradesPerDay, type JobPreview } from './sim';
@@ -166,7 +167,7 @@ function lerp(a: number, b: number, f: number) {
 
 function truckView(s: GameState, truck: Truck, fleetNo: number): TruckView {
   const driver = driverOfTruck(s, truck);
-  const base = { truck, driver, fleetNo, costPerHour: ((driver?.salaryPerDay ?? 0) + truck.leasePerDay) / 24 };
+  const base = { truck, driver, fleetNo, costPerHour: ((driver?.salaryPerDay ?? 0) + truck.leasePerDay + trailerOf(truck).leasePerDay) / 24 };
   const here = CITY_BY_ID[truck.cityId];
   const serviceQuoteNow = serviceQuote(s, truck);
   if (truck.serviceUntil !== null) {
@@ -271,7 +272,7 @@ export function buildSnapshot(s: GameState): Snapshot {
     today: s.today,
     totals: s.totals,
     costsByCategory: s.costsByCategory,
-    dailyFixedCosts: s.drivers.reduce((a, d) => a + d.salaryPerDay, 0) + s.trucks.reduce((a, t) => a + t.leasePerDay, 0) + upgradesPerDay(s),
+    dailyFixedCosts: s.drivers.reduce((a, d) => a + d.salaryPerDay, 0) + s.trucks.reduce((a, t) => a + t.leasePerDay + trailerOf(t).leasePerDay, 0) + upgradesPerDay(s),
     company: companyView(s),
     drivers: s.drivers.map((d) => {
       const t = truckOfDriver(s, d);

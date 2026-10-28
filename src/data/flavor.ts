@@ -59,6 +59,8 @@ export interface CargoType {
   minT: number;
   maxT: number;
   rateMul: number;
+  /** Wymagana naczepa (domyślnie plandeka). */
+  trailer?: import('./trailers').TrailerType;
 }
 
 export const CARGO: readonly CargoType[] = [
@@ -68,9 +70,9 @@ export const CARGO: readonly CargoType[] = [
   { name: 'Kostka brukowa', minT: 22, maxT: 24, rateMul: 1.05 },
   { name: 'Części do pralek', minT: 8, maxT: 18, rateMul: 1.0 },
   { name: 'Meble z płyty (instrukcja osobno)', minT: 10, maxT: 18, rateMul: 1.0 },
-  { name: 'Pierogi mrożone', minT: 18, maxT: 22, rateMul: 1.15 },
+  { name: 'Pierogi mrożone', minT: 18, maxT: 22, rateMul: 1.25, trailer: 'reefer' },
   { name: 'Piwo regionalne', minT: 20, maxT: 24, rateMul: 1.05 },
-  { name: 'Jabłka grójeckie', minT: 18, maxT: 24, rateMul: 0.98 },
+  { name: 'Jabłka grójeckie', minT: 18, maxT: 24, rateMul: 1.2, trailer: 'reefer' },
   { name: 'Opony zimowe', minT: 6, maxT: 12, rateMul: 1.0 },
   { name: 'Bombki choinkowe (OSTROŻNIE)', minT: 3, maxT: 6, rateMul: 1.25 },
   { name: 'Węgiel (podobno ostatni)', minT: 24, maxT: 24, rateMul: 0.92 },
@@ -79,9 +81,23 @@ export const CARGO: readonly CargoType[] = [
   { name: 'Lodówki (puste, niestety)', minT: 6, maxT: 10, rateMul: 1.02 },
   { name: 'Kapusta na bigos', minT: 18, maxT: 24, rateMul: 0.95 },
   { name: 'Rowery (do złożenia przez klienta)', minT: 5, maxT: 9, rateMul: 1.08 },
-  { name: 'Kabanosy (zapach w kabinie gratis)', minT: 14, maxT: 20, rateMul: 1.1 },
+  { name: 'Kabanosy (zapach w kabinie gratis)', minT: 14, maxT: 20, rateMul: 1.25, trailer: 'reefer' },
   { name: 'Choinki (igły wszędzie)', minT: 8, maxT: 14, rateMul: 1.08 },
   { name: 'Puste palety EPAL (ironia losu)', minT: 8, maxT: 12, rateMul: 0.9 },
+  // Chłodnia
+  { name: 'Lody (topnieją od samego patrzenia)', minT: 12, maxT: 20, rateMul: 1.3, trailer: 'reefer' },
+  { name: 'Mrożone frytki', minT: 18, maxT: 24, rateMul: 1.22, trailer: 'reefer' },
+  { name: 'Truskawki kaszubskie', minT: 10, maxT: 16, rateMul: 1.3, trailer: 'reefer' },
+  { name: 'Leki (2–8°C, aptekarz dzwoni co godzinę)', minT: 4, maxT: 10, rateMul: 1.4, trailer: 'reefer' },
+  // ADR
+  { name: 'Olej napędowy (ADR kl. 3)', minT: 24, maxT: 25, rateMul: 1.45, trailer: 'adr' },
+  { name: 'Rozpuszczalnik (ADR kl. 3)', minT: 18, maxT: 24, rateMul: 1.45, trailer: 'adr' },
+  { name: 'Kwas siarkowy (ADR kl. 8)', minT: 20, maxT: 25, rateMul: 1.5, trailer: 'adr' },
+  // Niskopodwozie
+  { name: 'Koparka (gabaryt)', minT: 18, maxT: 24, rateMul: 1.4, trailer: 'lowbed' },
+  { name: 'Kombajn zbożowy (szeroki jak droga)', minT: 14, maxT: 20, rateMul: 1.45, trailer: 'lowbed' },
+  { name: 'Transformator (ciężki jak życie)', minT: 30, maxT: 40, rateMul: 1.5, trailer: 'lowbed' },
+  { name: 'Walec drogowy', minT: 10, maxT: 14, rateMul: 1.35, trailer: 'lowbed' },
 ];
 
 export const CLIENTS = [

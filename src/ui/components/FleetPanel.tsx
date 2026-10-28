@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { BALANCE } from '../../data/balance';
 import type { CourseId } from '../../data/development';
+import { RANKS } from '../../data/progression';
+import { TRAILER_LIST, TRAILERS, type TrailerType } from '../../data/trailers';
 import { CITY_BY_ID } from '../../data/cities';
 import { MARKETS } from '../../data/progression';
 import { dutyAfterIdle } from '../../engine/drivingRules';
@@ -29,6 +31,7 @@ export interface FleetActions {
   lease: (offerId: string) => void;
   returnTruck: (truckId: string) => void;
   train: (driverId: string, courseId: CourseId) => void;
+  trailer: (truckId: string, type: TrailerType) => void;
 }
 
 const stop = (fn: () => void) => (e: { stopPropagation(): void }) => {
@@ -175,7 +178,28 @@ function Details({ t, snap, a }: { t: TruckView; snap: Snapshot; a: FleetActions
           {truck.condition === 'new' ? 'Nowe · ' : ''}Euro {truck.euro} · {km(truck.odometerKm)} · {truck.fuelL100} l/100
         </dd>
         <dt>Leasing</dt>
-        <dd className="num">{pln(truck.leasePerDay)}/dzień</dd>
+        <dd className="num">
+          {pln(truck.leasePerDay)}/dzień{truck.trailer && truck.trailer !== 'curtain' ? ` + naczepa ${pln(TRAILERS[truck.trailer].leasePerDay)}` : ''}
+        </dd>
+        <dt>Naczepa</dt>
+        <dd>
+          <select
+            className="pair-select"
+            value={truck.trailer ?? 'curtain'}
+            disabled={!!t.trip}
+            aria-label="Naczepa"
+            onChange={(e) => a.trailer(truck.id, e.target.value as TrailerType)}
+          >
+            {TRAILER_LIST.map((tr) => (
+              <option key={tr.id} value={tr.id} disabled={snap.company.rank < tr.rank}>
+                {tr.name}
+                {tr.leasePerDay ? ` · ${pln(tr.leasePerDay)}/dzień, podpięcie ${pln(tr.swapFee)}` : ' · w pakiecie'}
+                {snap.company.rank < tr.rank ? ` · od rangi „${RANKS[tr.rank].name}”` : ''}
+              </option>
+            ))}
+          </select>
+          <div className="muted trailer-desc">{TRAILERS[truck.trailer ?? 'curtain'].desc}</div>
+        </dd>
       </dl>
       {d && <p className="quirk">{d.quirk}</p>}
       {idle && (
@@ -223,6 +247,11 @@ function TruckCard({
     .join(' ');
   const plateWear = (
     <>
+      {truck.trailer && truck.trailer !== 'curtain' && (
+        <span className={`badge trailer t-${truck.trailer}`} title={TRAILERS[truck.trailer].desc}>
+          + {TRAILERS[truck.trailer].short}
+        </span>
+      )}
       <span className="plate">{truck.plate}</span>
       <span className="wear-label" title="Zużycie: im wyższe, tym częstsze awarie i wyższe spalanie. Serwis je obniża, ale nie poniżej poziomu wynikającego z przebiegu.">
         <span className="fc-wear">

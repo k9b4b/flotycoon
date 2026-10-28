@@ -1,7 +1,8 @@
 import { BALANCE } from '../data/balance';
 import { CITIES, CITY_BY_ID } from '../data/cities';
 import { CONTRACTS } from '../data/development';
-import { CARGO, CLIENTS } from '../data/flavor';
+import { CLIENTS } from '../data/flavor';
+import { pickCargo } from './cargo';
 import { addReputation, rankIndex } from './company';
 import { earn, fmtPLN, log, newId, spend, type ActionResult } from './core';
 import { planTrip } from './drivingRules';
@@ -35,7 +36,7 @@ function makeOffer(s: GameState): ContractOffer {
   let guard = 0;
   while ((to.id === from.id || roadKm(from.id, to.id) < 120 || roadKm(from.id, to.id) > 560) && guard++ < 80) to = pickWeighted(r, CITIES, (c) => c.weight);
   const km = roadKm(from.id, to.id);
-  const cargo = pick(r, CARGO);
+  const cargo = pickCargo(s, true);
   const rate = ((BALANCE.rateMinPerKm + BALANCE.rateMaxPerKm) / 2) * cargo.rateMul * CONTRACTS.rateMul * randRange(r, 0.97, 1.05);
   const shortBonus = km < 250 ? 1 + (250 - km) / 600 : 1;
   const paymentPerRun = Math.round((km * rate * shortBonus) / 10) * 10;
@@ -55,6 +56,7 @@ function makeOffer(s: GameState): ContractOffer {
     runsTotal,
     penaltyPerMiss: Math.round((paymentPerRun * CONTRACTS.missPenalty) / 10) * 10,
     bonus: Math.round((paymentPerRun * runsTotal * CONTRACTS.completionBonus) / 10) * 10,
+    ...(cargo.trailer && cargo.trailer !== 'curtain' ? { trailer: cargo.trailer } : {}),
     expiresAt: s.now + CONTRACTS.offersEveryDays * DAY,
   };
 }
@@ -110,6 +112,7 @@ export function onContractPost(s: GameState, contractId: string) {
     postedAt: s.now,
     expiresAt: c.nextRunAt + CONTRACTS.acceptGraceH * 60,
     contractId: c.id,
+    ...(c.trailer ? { trailer: c.trailer } : {}),
   };
   s.market.unshift(job);
   c.pendingJobId = job.id;

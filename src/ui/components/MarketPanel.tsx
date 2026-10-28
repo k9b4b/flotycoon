@@ -4,6 +4,8 @@ import type { Snapshot } from '../../engine/view';
 import { city, km, pln, plnSigned } from '../format';
 import type { MapPreview } from '../map/FleetMap';
 import { ContractsView } from './Contracts';
+import { RANKS } from '../../data/progression';
+import { TRAILERS } from '../../data/trailers';
 
 export function MarketPanel({
   snap,
@@ -35,7 +37,7 @@ export function MarketPanel({
     const pb = b.previews.find((p) => p.truckId === active.truck.id);
     // Najpierw bezpieczne, potem „na styk”, na końcu niewykonalne; w grupie wg zysku na godzinę.
     const score = (p?: (typeof a.previews)[number]) =>
-      p ? (p.onTime && !p.tooFar ? (p.tight ? 1e6 : 2e6) : 0) + p.profit / Math.max(60, p.durationMin) : 0;
+      p ? (p.onTime && !p.tooFar && !p.blocked ? (p.tight ? 1e6 : 2e6) : 0) + p.profit / Math.max(60, p.durationMin) : 0;
     return pinned(b) + score(pb) - (pinned(a) + score(pa));
   });
   const activeContracts = snap.contracts.filter((c) => c.status === 'active').length;
@@ -106,7 +108,14 @@ export function MarketPanel({
                   {city(j.fromId)} → {city(j.toId)} <span className="muted num" style={{ fontSize: 12 }}>{km(j.km)}</span>
                 </div>
                 <div className="meta">
-                  {j.contractId && <span className="badge contract">kontrakt</span>} {j.cargo} · {j.weightT} t · {j.client}
+                  {j.contractId && <span className="badge contract">kontrakt</span>}
+                  {j.trailer && (
+                    <span className={`badge trailer t-${j.trailer}`} title={TRAILERS[j.trailer].desc}>
+                      {TRAILERS[j.trailer].short}
+                      {snap.company.rank < TRAILERS[j.trailer].rank ? ` · od rangi „${RANKS[TRAILERS[j.trailer].rank].name}”` : ''}
+                    </span>
+                  )}{' '}
+                  {j.cargo} · {j.weightT} t · {j.client}
                 </div>
               </div>
               <div className="money">
@@ -138,7 +147,9 @@ export function MarketPanel({
                     <span className={p.profit >= 0 ? 'good num' : 'bad num'} title={`Paliwo ${pln(p.fuelCost)}, myto ${pln(p.tollCost)}, bez zdarzeń losowych`}>
                       {plnSigned(p.profit)}
                     </span>
-                    {p.tooFar ? (
+                    {p.blocked ? (
+                      <span className="badge bad">{p.blocked}</span>
+                    ) : p.tooFar ? (
                       <span className="badge bad">za daleko</span>
                     ) : !p.onTime ? (
                       <span className="badge bad">nie zdąży</span>
@@ -170,7 +181,7 @@ export function MarketPanel({
                   </button>
                   <button
                     className="btn small primary"
-                    disabled={!p || p.tooFar}
+                    disabled={!p || p.tooFar || !!p.blocked}
                     onClick={(e) => {
                       e.stopPropagation();
                       onPreview(null);

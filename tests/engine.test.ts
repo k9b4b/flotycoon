@@ -428,6 +428,7 @@ describe('kontrakty i rozwój kierowców', () => {
     const o = s.contractOffers[0];
     o.runsTotal = 2;
     o.everyDays = 4;
+    delete o.trailer; // test na zwykłej plandece
     E.signContract(s, o.id);
     const c = s.contracts[0];
     const t = s.trucks[0];
@@ -525,5 +526,54 @@ describe('kreator firmy', () => {
     s.cash = 1e6;
     expect(E.leaseOffer(s, s.truckOffers[0].id).ok).toBe(true);
     expect(s.trucks[1].cityId).toBe('POZ'); // auta z salonu odbiera się w siedzibie
+  });
+});
+
+describe('naczepy i ładunki specjalne', () => {
+  it('zlecenie na chłodnię wymaga chłodni, cysterna wymaga ADR, a gabaryt doświadczenia', async () => {
+    const E = await import('../src/engine/sim');
+    const s = newGame(60);
+    s.cash = 1e6;
+    const t = s.trucks[0];
+    const d = s.drivers[0];
+    const job = { ...s.market[0], id: 'jx', trailer: 'reefer' as const, fromId: t.cityId, expiresAt: s.now + 600 };
+    s.market.push(job);
+    expect(E.previewJob(s, job, t).blocked).toContain('chłodnia');
+    expect(E.acceptJob(s, 'jx', t.id).ok).toBe(false);
+    expect(E.setTrailer(s, t.id, 'reefer').ok).toBe(false); // ranga 0
+    s.reputation = 30;
+    expect(E.setTrailer(s, t.id, 'reefer').ok).toBe(true);
+    expect(E.previewJob(s, job, t).blocked).toBeNull();
+    const adr = { ...job, id: 'ja', trailer: 'adr' as const };
+    s.reputation = 150;
+    E.setTrailer(s, t.id, 'adr');
+    expect(E.previewJob(s, adr, t).blocked).toBe('kierowca bez ADR');
+    d.certs = ['adr'];
+    expect(E.previewJob(s, adr, t).blocked).toBeNull();
+    const low = { ...job, id: 'jl', trailer: 'lowbed' as const };
+    s.reputation = 450;
+    E.setTrailer(s, t.id, 'lowbed');
+    d.stats.experience = 40;
+    expect(E.previewJob(s, low, t).blocked).toContain('gabaryt');
+  });
+
+  it('kurs ADR daje uprawnienia i zdaje się raz', async () => {
+    const E = await import('../src/engine/sim');
+    const s = newGame(61);
+    s.cash = 1e6;
+    s.reputation = 150;
+    const d = s.drivers[0];
+    expect(E.trainDriver(s, d.id, 'adr').ok).toBe(true);
+    advanceTo(s, s.now + 3 * 24 * 60 + 1);
+    expect(d.certs).toContain('adr');
+    expect(E.trainDriver(s, d.id, 'adr').ok).toBe(false);
+  });
+
+  it('giełda zawsze ma pełną pulę zwykłych ładunków, a specjalne wiszą dodatkowo', async () => {
+    const s = newGame(62);
+    advanceTo(s, s.now + 3 * 60);
+    const open = s.market.filter((j) => !j.contractId);
+    expect(open.filter((j) => !j.trailer).length).toBeGreaterThanOrEqual(BALANCE.marketSize);
+    expect(open.some((j) => j.trailer)).toBe(true);
   });
 });

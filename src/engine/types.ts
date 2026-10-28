@@ -1,5 +1,6 @@
 import type { CourseId } from '../data/development';
 import type { PerkId } from '../data/perks';
+import type { TrailerType } from '../data/trailers';
 import type { DutyState } from './drivingRules';
 import type { Queue } from './queue';
 import type { RngState } from './rng';
@@ -34,6 +35,8 @@ export interface Driver {
   duty: DutyState;
   /** Czas gry ostatniej premii (pole opcjonalne: stare zapisy działają bez migracji). */
   lastBonusAt?: number;
+  /** Uprawnienia (np. ADR). */
+  certs?: 'adr'[];
   /** Mandaty z ITD na koncie (do perku „Teczka z papierami”). */
   fines?: number;
   /** Ile razy kierowca przeszedł dany kurs. */
@@ -61,6 +64,8 @@ export interface Truck {
   /** Kaucja leasingowa wpłacona przy odbiorze (przepada przy wcześniejszym zwrocie). */
   deposit?: number;
   condition?: TruckCondition;
+  /** Podpięta naczepa (brak = plandeka). */
+  trailer?: TrailerType;
 }
 
 export type TruckCondition = 'new' | 'used';
@@ -96,6 +101,8 @@ export interface Job {
   expiresAt: number;
   /** Kurs z kontraktu: nie znika z giełdy sam, a przepadnięcie kosztuje. */
   contractId?: string;
+  /** Wymagana naczepa (brak = plandeka). */
+  trailer?: TrailerType;
 }
 
 export interface ContractTerms {
@@ -111,6 +118,7 @@ export interface ContractTerms {
   runsTotal: number;
   penaltyPerMiss: number;
   bonus: number;
+  trailer?: TrailerType;
 }
 
 export interface ContractOffer extends ContractTerms {

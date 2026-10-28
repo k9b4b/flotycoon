@@ -840,3 +840,10 @@ select {
 .hq-traits { display: flex; flex-wrap: wrap; gap: 4px; }
 .hq-traits .fc-trait { font-size: 10.5px; padding: 1px 6px; }
 .setup-option { -webkit-tap-highlight-color: transparent; }
+
+/* Naczepy */
+.badge.trailer { margin-right: 4px; }
+.badge.t-reefer { color: #6cc6ff; border-color: #6cc6ff; }
+.badge.t-adr { color: #ff8f3a; border-color: #ff8f3a; }
+.badge.t-lowbed { color: #c9a0ff; border-color: #c9a0ff; }
+.trailer-desc { font-size: 12px; margin-top: 4px; }

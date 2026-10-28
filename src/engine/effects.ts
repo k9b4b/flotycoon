@@ -1,6 +1,7 @@
 import { BALANCE } from '../data/balance';
 import { INCIDENTS } from '../data/flavor';
 import { PERK_BY_ID, type PerkId, type PerkMods } from '../data/perks';
+import { TRAILERS } from '../data/trailers';
 import type { PlannedIncident } from './drivingRules';
 import { chance, pick, randInt, randRange, type RngState } from './rng';
 import type { Driver, Job, Truck } from './types';
@@ -31,6 +32,13 @@ export function perkMods(d: Driver): Mods {
 
 export const hasPerk = (d: Driver, id: PerkId) => (d.perks ?? []).includes(id);
 
+export const trailerOf = (t: Truck) => TRAILERS[t.trailer ?? 'curtain'];
+
+/** Prędkość zestawu: kierowca i naczepa (z gabarytem jedzie się wolniej). */
+export function rigSpeedKmh(t: Truck, d: Driver): number {
+  return driverSpeedKmh(d) * trailerOf(t).speedMul;
+}
+
 /** Doświadczenie: +/- kilka km/h średniej. Perki mogą dodać kilka procent. */
 export function driverSpeedKmh(d: Driver): number {
   return BALANCE.baseSpeedKmh * (0.93 + 0.12 * (d.stats.experience / 100)) * perkMods(d).speedMul;
@@ -46,7 +54,7 @@ export function fuelL100(truck: Truck, d: Driver, weightT: number, empty: boolea
   const eco = 1.12 - 0.22 * (d.stats.eco / 100); // dobry eco-driver: do −10%
   const wear = 1 + truck.wear * 0.15;
   const load = empty ? BALANCE.emptyFuelMul : 0.86 + 0.0075 * weightT;
-  return truck.fuelL100 * eco * wear * load * perkMods(d).fuelMul;
+  return truck.fuelL100 * eco * wear * load * perkMods(d).fuelMul * trailerOf(truck).fuelMul;
 }
 
 export function tripCosts(truck: Truck, d: Driver, job: Job, emptyKm: number) {
@@ -74,7 +82,7 @@ export function rollIncidents(r: RngState, truck: Truck, d: Driver, totalKm: num
     const cost = Math.round(randInt(r, 600, 2800) * (1 + truck.wear));
     out.push({ atKm: at(), min: randInt(r, 90, 240), info: { kind: 'breakdown', text: fill(pick(r, INCIDENTS.breakdown), d), cost, tone: 'bad' } });
   }
-  if (chance(r, 0.07 * longTrip)) {
+  if (chance(r, 0.07 * longTrip * trailerOf(truck).itdMul)) {
     const caught = chance(r, clamp((0.75 - 0.7 * (effectiveReliability(d) / 100)) * m.itdMul, 0, 0.95));
     out.push(
       caught

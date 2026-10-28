@@ -1,6 +1,6 @@
 import { COURSE_BY_ID, MILESTONES, TRAINING, type CourseId } from '../data/development';
 import { PERK_BY_ID, type PerkId } from '../data/perks';
-import { truckOfDriver } from './company';
+import { rankIndex, truckOfDriver } from './company';
 import { fmtPLN, g, log, spend, type ActionResult } from './core';
 import { clamp } from './effects';
 import { qPush } from './queue';
@@ -14,12 +14,14 @@ import type { Driver, GameState } from './types';
  */
 
 export const timesTaken = (d: Driver, id: CourseId) => d.courses?.[id] ?? 0;
+/** Kurs z uprawnieniami zdaje się raz; zwykłe można powtarzać. */
+export const maxRepeats = (id: CourseId) => (COURSE_BY_ID[id].cert ? 1 : TRAINING.maxRepeats);
 
 /** Ile kurs da teraz temu kierowcy: mniej przy wysokiej statystyce i przy kolejnych powtórkach. */
 export function courseGain(d: Driver, id: CourseId): number {
   const c = COURSE_BY_ID[id];
   const n = timesTaken(d, id);
-  if (n >= TRAINING.maxRepeats) return 0;
+  if (n >= maxRepeats(id)) return 0;
   const v = d.stats[c.stat];
   return Math.max(2, Math.round(c.gain * ((100 - v) / 100 + 0.25) * TRAINING.repeatMul[n]));
 }
@@ -31,7 +33,8 @@ export function trainDriver(s: GameState, driverId: string, courseId: CourseId):
   if (d.training) return { ok: false, error: `${d.nickname} już siedzi na szkoleniu.` };
   const t = truckOfDriver(s, d);
   if (t?.tripId) return { ok: false, error: `${d.nickname} jest w trasie. Szkolenie po rozładunku.` };
-  if (timesTaken(d, courseId) >= TRAINING.maxRepeats) return { ok: false, error: `${d.nickname} zna ten kurs na pamięć. Instruktor prosi, żeby już nie przychodzić.` };
+  if (timesTaken(d, courseId) >= maxRepeats(courseId)) return { ok: false, error: c.cert ? `${d.nickname} ma już te uprawnienia.` : `${d.nickname} zna ten kurs na pamięć. Instruktor prosi, żeby już nie przychodzić.` };
+  if (c.rank && rankIndex(s.reputation) < c.rank) return { ok: false, error: 'Ten kurs jest dostępny od wyższej rangi firmy.' };
   if (s.cash < c.cost) return { ok: false, error: `Kurs kosztuje ${fmtPLN(c.cost)}.` };
   spend(s, c.cost, 'training');
   // Na czas szkolenia auto zostaje bez kierowcy: może je wziąć zmiennik.
@@ -55,6 +58,10 @@ export function onTrainingDone(s: GameState, driverId: string) {
   d.stats.morale = clamp(d.stats.morale + TRAINING.moraleAfter);
   d.training = null;
   const extra: string[] = [];
+  if (c.cert && !(d.certs ?? []).includes(c.cert)) {
+    d.certs = [...(d.certs ?? []), c.cert];
+    extra.push('Uprawnienia ADR w kieszeni: może wozić cysterny.');
+  }
   if (c.fixes && d.perks.includes(c.fixes) && chance(s.rng, TRAINING.fixChance)) {
     d.perks = d.perks.filter((p) => p !== c.fixes);
     extra.push(`Pożegnał${g(d)} się z cechą „${PERK_BY_ID[c.fixes].name}”!`);

@@ -93,6 +93,8 @@ Ranga odblokowuje rozbudowę bazy, a im wyższa, tym lepsi kandydaci na kierowc�
 
 **Kontrakty** (`engine/contracts.ts`, liczby w `data/development.ts`): od rangi „Firma krzak” klienci proponują stałe trasy (np. co 3 dni, 6–12 kursów) za stawkę o ok. 12% lepszą od giełdy. Każdy kurs pojawia się na giełdzie dobę przed załadunkiem i wisi na górze listy. Kurs, którego nikt nie weźmie, kosztuje karę; spóźnienie albo przepadnięty kurs to wpadka, a po 3 wpadkach klient zrywa umowę. Dokończona umowa daje premię i reputację. Limit kontraktów rośnie z rangą (biuro +1), Halina bierze kursy kontraktowe w pierwszej kolejności.
 
+**Naczepy i ładunki specjalne** (`data/trailers.ts`, ładunki w `data/flavor.ts`): każdy zestaw ma jedną naczepę. Plandeka jest w pakiecie z ciągnikiem; chłodnia (od rangi 1, +6% paliwa), cysterna ADR (od rangi 2, kierowca z kursem ADR, częstsze kontrole) i niskopodwozie na gabaryty (od rangi 3, wolniej, doświadczenie min. 55) kosztują ratę dzienną i opłatę za podpięcie, a ich ładunki płacą ok. 25–50% lepiej. Ładunki specjalne wiszą na giełdzie obok zwykłych (ok. 35% więcej ofert), zablokowane rangą pojawiają się rzadko jako zachęta. Kontrakty mogą wymagać naczepy specjalnej. Giełda pokazuje, czy zestaw się nadaje („wymaga naczepy: chłodnia”, „kierowca bez ADR”), a naczepę zmienia się w Szczegółach stojącego zestawu.
+
 **Rozwój kierowców** (`engine/training.ts`): cztery szkolenia (eco-driving, tachograf i przepisy, ODTJ, „zdrowy sen i kręgosłup”) podnoszą statystykę, coraz mniej przy wysokim poziomie i kolejnych powtórkach (maks. 3). Kursy mogą wyleczyć zły perk („Ciężka noga”, „Zapominalski”, „Kocha MOP-y”), a ODTJ zamienia czasem „Pirata drogowego” w „Byłego rajdowca”. Na czas szkolenia auto zostaje bez kierowcy. Perki przychodzą też z doświadczeniem: „Zna skróty” po 50 tys. km, „Ulubieniec magazynierów” przy wielu kursach bez spóźnień, „Teczka z papierami” po długim przebiegu bez mandatów; „Pechowiec” i „Maruda” mogą zniknąć.
 
 Przy obecnym balansie prosty bot dochodzi do „Przewoźnika krajowego” po ok. 3 miesiącach gry, a po roku ma 12 aut.
@@ -123,8 +125,8 @@ Wszystkie liczby balansu są w `data/balance.ts`. Wartości rynkowe (diesel, e-T
 ## Następne kroki
 
 1. Kontrakty ze stałymi klientami (regularne trasy, pewna stawka, kary za zawalenie).
-2. Licencje: międzynarodowa (otwiera Europę), ADR, chłodnie.
-3. Naczepy (plandeka, chłodnia, ADR) i dopasowanie do ładunków.
+2. Licencja międzynarodowa (otwiera Europę).
+3. Kupno aut zamiast leasingu i rynek wtórny.
 4. Finanse: kredyt, faktury z terminem płatności (zatory płatnicze!), bankructwo.
 5. Europa: kraje, waluty, myto, ceny paliwa, kabotaż, zakazy weekendowe, języki kierowców. Razem z Europą **podwójna obsada**: drugi kierowca w zestawie (pauza 45 min w jadącym aucie, 9 h odpoczynku na postoju w ciągu 30 h, ok. 1,7× więcej km na dobę), ekspresy z wyższą stawką i dopasowanie charakterów w parze (morale).
 6. Osiągnięcia i więcej zdarzeń.

@@ -61,7 +61,8 @@ export function botTick(s: GameState, opts: { grow?: boolean } = {}) {
     }
   }
   // Kontrakty: bierze stałe trasy, gdy ma zapas aut (jeden kontrakt na trzy zestawy).
-  for (const o of [...s.contractOffers]) {
+  // Bot jeździ tylko z plandekami, więc kontrakty na chłodnie i cysterny omija.
+  for (const o of s.contractOffers.filter((x) => !x.trailer)) {
     if (s.trucks.length < 4 || activeContracts(s).length >= Math.min(maxContracts(s), Math.floor(s.trucks.length / 3))) break;
     signContract(s, o.id);
   }

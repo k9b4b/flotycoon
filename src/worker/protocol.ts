@@ -1,6 +1,7 @@
 import type { CatchUpReport, ActionResult, GameSetup, SetupOptions } from '../engine/sim';
 import type { Snapshot } from '../engine/view';
 import type { TutorialState } from '../engine/types';
+import type { TrailerType } from '../data/trailers';
 import type { UpgradeId } from '../data/progression';
 import type { CourseId } from '../data/development';
 
@@ -29,6 +30,7 @@ export interface SimApi {
   setAskDecisions(on: boolean): ActionResult;
   signContract(offerId: string): ActionResult;
   setTutorial(t: TutorialState): ActionResult;
+  setTrailer(truckId: string, type: TrailerType): ActionResult;
   trainDriver(driverId: string, courseId: CourseId): ActionResult;
   newGame(seed?: number): void;
   save(): Promise<boolean>;

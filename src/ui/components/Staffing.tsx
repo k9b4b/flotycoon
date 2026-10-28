@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { BALANCE } from '../../data/balance';
-import { COURSES, COURSE_BY_ID, TRAINING } from '../../data/development';
-import { courseGain, timesTaken } from '../../engine/training';
+import { COURSES, COURSE_BY_ID } from '../../data/development';
+import { courseGain, maxRepeats, timesTaken } from '../../engine/training';
 import { formatGameTime } from '../../engine/time';
 import type { Driver } from '../../engine/types';
 import { MARKETS, RANKS } from '../../data/progression';
@@ -49,9 +49,10 @@ export function DriversList({ snap, a, onHire }: { snap: Snapshot; a: FleetActio
             ) : (
               <span className="fs-idle">Bez auta</span>
             )}
+            {(d.certs ?? []).includes('adr') && <span className="badge trailer t-adr">ADR</span>}
             <TraitChips d={d} />
           </div>
-          <Training d={d} onTrip={onTrip} cash={snap.cash} a={a} />
+          <Training d={d} onTrip={onTrip} cash={snap.cash} rank={snap.company.rank} a={a} />
           <div className="fc-actions">
             <TruckPicker snap={snap} dv={dv} a={a} />
             <button className="btn small danger" disabled={onTrip} onClick={() => a.fire(d.id)} title={onTrip ? 'Zwolnić można po rozładunku' : undefined}>
@@ -71,7 +72,7 @@ export function DriversList({ snap, a, onHire }: { snap: Snapshot; a: FleetActio
 const STAT_SHORT = { experience: 'doświadczenie', eco: 'eco-driving', reliability: 'niezawodność', stamina: 'kondycja' } as const;
 
 /** Szkolenia kierowcy: rozwijane, żeby nie zaśmiecać listy. */
-function Training({ d, onTrip, cash, a }: { d: Driver; onTrip: boolean; cash: number; a: FleetActions }) {
+function Training({ d, onTrip, cash, rank, a }: { d: Driver; onTrip: boolean; cash: number; rank: number; a: FleetActions }) {
   const [open, setOpen] = useState(false);
   const busy = onTrip || !!d.training;
   return (
@@ -85,7 +86,8 @@ function Training({ d, onTrip, cash, a }: { d: Driver; onTrip: boolean; cash: nu
           {COURSES.map((c) => {
             const n = timesTaken(d, c.id);
             const gain = courseGain(d, c.id);
-            const maxed = n >= TRAINING.maxRepeats;
+            const maxed = n >= maxRepeats(c.id);
+            const locked = !!c.rank && rank < c.rank;
             const fix = c.fixes && d.perks.includes(c.fixes);
             const conv = c.converts && d.perks.includes(c.converts[0]);
             return (
@@ -98,14 +100,22 @@ function Training({ d, onTrip, cash, a }: { d: Driver; onTrip: boolean; cash: nu
                 </div>
                 <div className="muted course-desc">{c.desc}</div>
                 <div className="course-foot">
-                  <span className={maxed ? 'muted' : 'good'}>
-                    {maxed ? 'Kurs zaliczony do oporu' : `${STAT_SHORT[c.stat]} +${gain}`}
+                  <span className={maxed || locked ? 'muted' : 'good'}>
+                    {locked
+                      ? 'Dostępny od wyższej rangi'
+                      : maxed
+                        ? c.cert
+                          ? 'Uprawnienia już są'
+                          : 'Kurs zaliczony do oporu'
+                        : c.cert
+                          ? `uprawnienia ${c.cert.toUpperCase()} · ${STAT_SHORT[c.stat]} +${gain}`
+                          : `${STAT_SHORT[c.stat]} +${gain}`}
                     {(fix || conv) && !maxed ? ' · może pomóc na cechę!' : ''}
                   </span>
                   <span className="muted num">
-                    {n}/{TRAINING.maxRepeats}
+                    {n}/{maxRepeats(c.id)}
                   </span>
-                  <button className="btn small primary" disabled={busy || maxed || cash < c.cost} onClick={() => a.train(d.id, c.id)}>
+                  <button className="btn small primary" disabled={busy || maxed || locked || cash < c.cost} onClick={() => a.train(d.id, c.id)}>
                     Zapisz
                   </button>
                 </div>

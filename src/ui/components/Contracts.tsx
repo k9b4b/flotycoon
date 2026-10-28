@@ -1,5 +1,6 @@
 import { CONTRACTS } from '../../data/development';
 import { RANKS } from '../../data/progression';
+import { TRAILERS } from '../../data/trailers';
 import { formatGameTime } from '../../engine/time';
 import type { Snapshot } from '../../engine/view';
 import type { Contract } from '../../engine/types';
@@ -38,6 +39,7 @@ function ActiveCard({ c, snap }: { c: Contract; snap: Snapshot }) {
       </div>
       <div className="staff-line">
         <span className="muted">
+          {c.trailer ? `${TRAILERS[c.trailer].short} · ` : ''}
           {c.cargo} · {every(c.everyDays)} · {pln(c.paymentPerRun)}/kurs
         </span>
         {c.status === 'active' && (
@@ -79,6 +81,7 @@ export function ContractsView({ snap, onSign }: { snap: Snapshot; onSign: (id: s
             <span className="num">{pln(o.paymentPerRun)}/kurs</span>
           </div>
           <div className="staff-specs">
+            {o.trailer && <span className={`badge trailer t-${o.trailer}`}>{TRAILERS[o.trailer].short}</span>}
             <span>{o.cargo}</span>
             <span>{o.weightT} t</span>
             <span>{every(o.everyDays)}</span>

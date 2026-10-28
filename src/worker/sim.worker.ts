@@ -114,6 +114,7 @@ const api: SimApi = {
   setAskDecisions: (on) => act(() => E.setAskDecisions(state!, on)),
   signContract: (id) => act(() => E.signContract(state!, id)),
   setTutorial: (t) => act(() => E.setTutorial(state!, t)),
+  setTrailer: (truckId, type) => act(() => E.setTrailer(state!, truckId, type)),
   trainDriver: (driverId, courseId) => act(() => E.trainDriver(state!, driverId, courseId)),
   newGame(seed) {
     state = newGame(seed ?? ((Math.random() * 2 ** 31) | 0));

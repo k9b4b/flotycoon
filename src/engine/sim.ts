@@ -1,8 +1,8 @@
 import { BALANCE } from '../data/balance';
 import { CITIES, CITY_BY_ID, HOME_BASE } from '../data/cities';
 import { hqProfile } from '../data/hq';
-import { ARRIVE_FLAVOR, CARGO, CB_DEPART, CLIENTS, COMPANY_START, DAILY_FLAVOR, LATE_EXCUSES, NICKNAMES } from '../data/flavor';
-import { MARKETS, OFFICE, REPUTATION } from '../data/progression';
+import { ARRIVE_FLAVOR, CB_DEPART, CLIENTS, COMPANY_START, DAILY_FLAVOR, LATE_EXCUSES, NICKNAMES } from '../data/flavor';
+import { MARKETS, OFFICE, RANKS, REPUTATION } from '../data/progression';
 import {
   addReputation,
   driverOfTruck,
@@ -18,7 +18,9 @@ import {
 } from './company';
 import { driverName, earn, fmtPLN, g, log, newId, spend, type ActionResult } from './core';
 import { FRESH_DUTY, planTrip, type Leg } from './drivingRules';
-import { clamp, driverSpeedKmh, perkMods, rollIncidents, tripCosts } from './effects';
+import { clamp, perkMods, rigSpeedKmh, rollIncidents, trailerOf, tripCosts } from './effects';
+import { TRAILERS, type TrailerType } from '../data/trailers';
+import { pickCargo } from './cargo';
 import { createQueue, qPeek, qPop, qPush } from './queue';
 import { chance, createRng, pick, pickWeighted, rand, randInt, randRange } from './rng';
 import { onContractCheck, onContractOffers, onContractPost, onContractRunDone, refreshContractOffers } from './contracts';
@@ -61,7 +63,8 @@ function pickOrigin(s: GameState): string {
   return pickWeighted(r, CITIES, (c) => c.weight).id;
 }
 
-export function generateJob(s: GameState, forcedFrom?: string): Job {
+/** special: true = ładunek na naczepę specjalną, false = plandeka, brak = dowolny. */
+export function generateJob(s: GameState, forcedFrom?: string, special?: boolean): Job {
   const r = s.rng;
   const fromId = forcedFrom ?? pickOrigin(s);
   let to = pickWeighted(r, CITIES, (c) => c.weight);
@@ -70,7 +73,7 @@ export function generateJob(s: GameState, forcedFrom?: string): Job {
     to = pickWeighted(r, CITIES, (c) => c.weight);
   }
   const km = roadKm(fromId, to.id);
-  const cargo = pick(r, CARGO);
+  const cargo = pickCargo(s, false, special);
   const urgent = chance(r, 0.15);
   const ratePerKm = randRange(r, BALANCE.rateMinPerKm, BALANCE.rateMaxPerKm) * cargo.rateMul * (urgent ? 1.2 : 1);
   // Krótkie trasy mają wyższą stawkę za km (realnie tak jest: załadunek kosztuje tyle samo).
@@ -103,7 +106,27 @@ export function generateJob(s: GameState, forcedFrom?: string): Job {
     penaltyPerHour: Math.round((payment * randRange(r, 0.03, 0.06)) / 10) * 10,
     postedAt: s.now,
     expiresAt: s.now + loadWindow,
+    ...(cargo.trailer && cargo.trailer !== 'curtain' ? { trailer: cargo.trailer } : {}),
   };
+}
+
+/** Podpina inną naczepę do stojącego zestawu. */
+export function setTrailer(s: GameState, truckId: string, type: TrailerType): ActionResult {
+  const t = s.trucks.find((x) => x.id === truckId);
+  const spec = TRAILERS[type];
+  if (!t || !spec) return { ok: false, error: 'Nie ma takiego auta albo naczepy.' };
+  if (t.tripId) return { ok: false, error: 'Zestaw jest w trasie. Naczepę zmienisz po rozładunku.' };
+  if ((t.trailer ?? 'curtain') === type) return { ok: false, error: `${spec.name} już jest podpięta.` };
+  if (rankIndex(s.reputation) < spec.rank) return { ok: false, error: `${spec.name}: dealer rozmawia dopiero z rangą „${RANKS[spec.rank].name}”.` };
+  if (s.cash < spec.swapFee) return { ok: false, error: `Podpięcie kosztuje ${fmtPLN(spec.swapFee)}.` };
+  if (spec.swapFee) spend(s, spec.swapFee, 'fleet');
+  t.trailer = type;
+  const msg =
+    type === 'curtain'
+      ? `${t.brand} ${t.model} (${t.plate}) wraca do zwykłej plandeki. Rata za naczepę specjalną już nie leci.`
+      : `Do ${t.brand} ${t.model} (${t.plate}) podpięto: ${spec.name.toLowerCase()}. Rata naczepy ${fmtPLN(spec.leasePerDay)}/dzień.`;
+  log(s, 'info', msg);
+  return { ok: true, message: msg };
 }
 
 const marketSize = (s: GameState) => BALANCE.marketSize + (s.base.office ? OFFICE.extraOffers : 0) + hqProfile(s.hqCityId).market;
@@ -111,8 +134,13 @@ const marketSize = (s: GameState) => BALANCE.marketSize + (s.base.office ? OFFIC
 function refillMarket(s: GameState) {
   // Kursy kontraktowe zdejmuje z giełdy dopiero sprawdzenie kontraktu (przepadnięcie kosztuje).
   s.market = s.market.filter((j) => j.contractId || j.expiresAt > s.now);
-  let open = s.market.filter((j) => !j.contractId).length;
-  while (open++ < marketSize(s)) s.market.push(generateJob(s));
+  // Ładunki specjalne wiszą obok zwykłych, a nie zamiast nich: plandeka ma zawsze pełną giełdę.
+  const open = s.market.filter((j) => !j.contractId);
+  let plain = open.filter((j) => !j.trailer).length;
+  let special = open.length - plain;
+  while (plain++ < marketSize(s)) s.market.push(generateJob(s, undefined, false));
+  const specialTarget = Math.round(marketSize(s) * BALANCE.specialShare);
+  while (special++ < specialTarget) s.market.push(generateJob(s, undefined, true));
 }
 
 // ─── Nowa gra ────────────────────────────────────────────────────────────────
@@ -261,6 +289,8 @@ export interface JobPreview {
   /** Ile minut kursu to obowiązkowy odpoczynek dobowy (tachograf). */
   restMin: number;
   tooFar: boolean;
+  /** Zestaw się nie nadaje (naczepa, uprawnienia): powód albo null. */
+  blocked: string | null;
 }
 
 function legsFor(job: Job, emptyKm: number): Leg[] {
@@ -275,7 +305,7 @@ export function previewJob(s: GameState, job: Job, truck: Truck): JobPreview {
   const driver = driverOfTruck(s, truck);
   if (!driver) throw new Error(`Auto ${truck.id} nie ma kierowcy`);
   const emptyKm = roadKm(truck.cityId, job.fromId);
-  const { phases } = planTrip(s.now, legsFor(job, emptyKm), driverSpeedKmh(driver), [], driver.duty);
+  const { phases } = planTrip(s.now, legsFor(job, emptyKm), rigSpeedKmh(truck, driver), [], driver.duty);
   const eta = phases[phases.length - 1].end;
   const { fuelCost, tollCost } = tripCosts(truck, driver, job, emptyKm);
   return {
@@ -291,7 +321,17 @@ export function previewJob(s: GameState, job: Job, truck: Truck): JobPreview {
     tight: eta <= job.deadline && job.deadline - eta < BALANCE.tightBufferMin,
     restMin: phases.filter((p) => p.kind === 'rest').reduce((a, p) => a + p.end - p.start, 0),
     tooFar: emptyKm > BALANCE.maxEmptyRunKm,
+    blocked: jobFit(truck, driver, job),
   };
+}
+
+/** Czy zestaw może wziąć ładunek: naczepa i uprawnienia kierowcy. Zwraca powód odmowy albo null. */
+export function jobFit(truck: Truck, driver: Driver, job: Job): string | null {
+  const need = TRAILERS[job.trailer ?? 'curtain'];
+  if ((truck.trailer ?? 'curtain') !== need.id) return `wymaga naczepy: ${need.short}`;
+  if (need.cert && !(driver.certs ?? []).includes(need.cert)) return 'kierowca bez ADR';
+  if (need.minExperience && driver.stats.experience < need.minExperience) return `gabaryt: doświadczenie min. ${need.minExperience}`;
+  return null;
 }
 
 export function acceptJob(s: GameState, jobId: string, truckId: string): ActionResult {
@@ -306,8 +346,10 @@ export function acceptJob(s: GameState, jobId: string, truckId: string): ActionR
   const emptyKm = roadKm(truck.cityId, job.fromId);
   if (emptyKm > BALANCE.maxEmptyRunKm) return { ok: false, error: `Dojazd na pusto ${emptyKm} km. Księgowa zemdlała.` };
 
+  const misfit = jobFit(truck, driver, job);
+  if (misfit) return { ok: false, error: `Ten zestaw się nie nada: ${misfit}.` };
   const incidents = rollIncidents(s.rng, truck, driver, emptyKm + job.km);
-  const { phases, duty } = planTrip(s.now, legsFor(job, emptyKm), driverSpeedKmh(driver), incidents, driver.duty);
+  const { phases, duty } = planTrip(s.now, legsFor(job, emptyKm), rigSpeedKmh(truck, driver), incidents, driver.duty);
   const costs = tripCosts(truck, driver, job, emptyKm);
   const trip: Trip = {
     id: newId(s, 'r'),
@@ -526,7 +568,7 @@ export function bestSafeJob(s: GameState, t: Truck, allowTight = false): Job | n
   for (const j of s.market) {
     if (j.expiresAt <= s.now) continue;
     const p = previewJob(s, j, t);
-    if (!p.onTime || (p.tight && !allowTight) || p.tooFar || p.profit <= 0) continue;
+    if (p.blocked || !p.onTime || (p.tight && !allowTight) || p.tooFar || p.profit <= 0) continue;
     // Kurs z kontraktu ma pierwszeństwo: przepadnięcie kosztuje karę i reputację.
     const score = (p.profit / Math.max(60, p.durationMin)) * (j.contractId ? 3 : 1);
     if (score > bestScore) {
@@ -634,13 +676,14 @@ function onTripDone(s: GameState, tripId: string): boolean {
   if (driver) checkMilestones(s, driver, kmBefore);
   // Spedytor od razu szuka ładunku powrotnego z miejsca rozładunku.
   const backloads = BALANCE.backloadOffers + (s.base.office ? OFFICE.extraBackload : 0);
-  for (let i = 0; i < backloads; i++) s.market.push(generateJob(s, job.toId));
+  for (let i = 0; i < backloads; i++) s.market.push(generateJob(s, job.toId, false));
+  if (chance(s.rng, BALANCE.specialShare)) s.market.push(generateJob(s, job.toId, true));
   return true;
 }
 
 function onDaily(s: GameState) {
   const salaries = s.drivers.reduce((sum, d) => sum + d.salaryPerDay, 0);
-  const leases = s.trucks.reduce((sum, t) => sum + t.leasePerDay, 0);
+  const leases = s.trucks.reduce((sum, t) => sum + t.leasePerDay + trailerOf(t).leasePerDay, 0);
   spend(s, salaries, 'salaries');
   spend(s, leases, 'lease');
   const base = upgradesPerDay(s);

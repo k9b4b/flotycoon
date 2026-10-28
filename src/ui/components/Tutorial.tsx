@@ -223,6 +223,19 @@ const TIPS: Tip[] = [
     ),
   },
   {
+    id: 'trailers',
+    when: (s) => s.company.rank >= 1 && s.totals.jobsDone >= 8,
+    target: '.area-market',
+    tab: 'market',
+    next: true,
+    text: (
+      <>
+        Na giełdzie wiszą też ładunki na <b>chłodnię</b>: płacą lepiej. Naczepę zmienisz w Szczegółach zestawu (opłata za podpięcie i rata
+        dzienna). Później dojdą cysterny ADR (kierowca potrzebuje kursu) i gabaryty na niskopodwoziu.
+      </>
+    ),
+  },
+  {
     id: 'yard',
     when: (s) => !!s.company.nextYard?.unlocked && s.fleet.length >= s.company.fleetCap,
     target: '.area-growth',
@@ -371,6 +384,7 @@ export function HelpSheet({ onClose, onNewGame }: { onClose: () => void; onNewGa
     ['Telefony z trasy', 'Gdy coś się dzieje, kierowca dzwoni i zegar czeka na decyzję. W tle albo po wyłączeniu w Firmie decyduje sam, zgodnie ze swoim charakterem.'],
     ['Rozwój firmy', 'Terminowe kursy dają reputację, spóźnienia i mandaty ją zabierają. Ranga odblokowuje lepszych kandydatów, nowe auta, większy plac, warsztat, biuro i dyspozytorkę Halinę.'],
     ['Kontrakty', 'Od rangi „Firma krzak”: stała trasa co kilka dni za lepszą stawkę. Kurs pojawia się na giełdzie dobę wcześniej. Przepadnięty kurs kosztuje karę, trzy wpadki i umowa przepada, dokończona daje premię.'],
+    ['Naczepy', 'Plandeka jest w pakiecie. Chłodnia (od rangi 1), cysterna ADR (od rangi 2, kierowca musi mieć kurs ADR) i niskopodwozie na gabaryty (od rangi 3, doświadczenie min. 55) kosztują ratę dzienną i opłatę za podpięcie, ale ich ładunki płacą 25–50% lepiej. Naczepę zmienisz w Szczegółach zestawu, gdy stoi.'],
     ['Szkolenia', 'Flota → Kierowcy → Szkolenia. Kurs podnosi statystykę (coraz mniej przy powtórkach) i czasem leczy złą cechę. Na czas kursu auto zostaje bez kierowcy.'],
   ];
   return (

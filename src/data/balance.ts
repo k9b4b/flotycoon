@@ -24,6 +24,8 @@ export const BALANCE = {
 
   // Rynek zleceń
   marketSize: 12,
+  /** Ile ładunków specjalnych (chłodnia, ADR, gabaryt) wisi dodatkowo, jako ułamek zwykłej giełdy. */
+  specialShare: 0.35,
   marketRefreshMin: 180,
   /** Ile ofert z miasta rozładunku pojawia się, gdy zestaw kończy kurs. */
   backloadOffers: 3,
